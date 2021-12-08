@@ -24,18 +24,6 @@ pyentrp 0.7.1
 scipy 1.7.2
 ```
 
-## Files
-The code consists of a number of scripts and modules including dependencies between the scripts. In the following, an overview of the included files and folders will be given.
-
-- data_py/
-	- 'OpenData.py' can be used to open and visualise the data.
-	- 'OpenDataUtilities.py' is a module containing functionality to open the data.
-	- 'Organise_units.py' is used to form the 'units_full_info.csv' file.
-	- 'Organise_regulering.py' is used to form the 'regulering.csv' file.
-	- 'Wind_mill_plot.py' is used for plotting the position of wind mills on top of a map of Denmark.
-	- 'Transform_coordinates.py' is a module used to transform between coordinate systems.
-	- 'Area_midpoints_and_NWP_grid.py' is used to compute the midpoints of the areas and check which NWP gridpoint is the closest to each area midpoint.
-
 
 ## Data
 - data_energinet/
@@ -70,17 +58,6 @@ The code consists of a number of scripts and modules including dependencies betw
   - New_Test_Data.mat
   - New_Training_Data.mat
   - New_Validation_Data.mat
-  - vejrdata_csv/ (main)
-  - vindfarmdata/
-    - regulering_matrix/
-    - scada_onshore_wind_production/
-  - plants.csv
-  - units_new.csv
-  - Wind_Power.csv (main)
-  - wind_areas_new.mat
-  - units_full_info.csv
-  - regulering.csv (main)
-  - area_NWP.csv (main)
 - Learning/
 - models/
 
