@@ -1,5 +1,5 @@
 # Prediction of the Wind Power Production
-This GitHub repository contains the scripts for the 9'th semester project on "Prediction of the Electrical Power Network" made by graduate students in Mathematical-Engineering at Aalborg University.
+This GitHub repository contains the scripts for the 9'th semester project on "Prediction of the Wind Power Production" made by graduate students in Mathematical-Engineering at Aalborg University.
 
 Authors:	Morten Stig Kaaber, Andreas Anton Andersen, and Martin Voigt Vejling
 
