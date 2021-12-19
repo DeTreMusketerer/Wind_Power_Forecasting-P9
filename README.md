@@ -1,11 +1,11 @@
 # Prediction of the Wind Power Production
-This GitHub repository contains the scripts for the 9'th semester project on "Prediction of the Wind Power Production" made by graduate students in Mathematical-Engineering at Aalborg University.
+This GitHub repository contains the scripts for the 9'th semester project on "Forecasting Wind Power Production" made by graduate students in Mathematical-Engineering at Aalborg University.
 
 Authors:	Morten Stig Kaaber, Andreas Anton Andersen, and Martin Voigt Vejling
 
 E-Mails:	{mkaabe17, aand17, mvejli17}@student.aau.dk
 
-In this work time series data is forecasted.
+In this work time series data is forecasted using autoregressive moving average models, recurrent neural networks, and the empirical mode decomposition.
 
 
 ## Dependencies
