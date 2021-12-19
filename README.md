@@ -68,6 +68,7 @@ scipy 1.7.2
 	- sVARMAX_Module.py
 - Parallel_RNN.py
 - Multi_RNN.py
+- EMD_LSTM_ARMA.py
 - sARIMAX_validation.py
 - sARIMAX_test.py
 - sVARIMAX_validation.py
@@ -86,6 +87,9 @@ scipy 1.7.2
 	
 `Multi_RNN.py`
 	- Script for training and testing multivariate LSTMs and GRUs.
+
+`EMD_LSTM_ARMA.py`
+	- Script for training and testing the EMD_LSTM_ARMA model.
 
 `sARIMAX_validation.py`
 	- Script for fitting and evaluating s-ARIMAX models using the subtraining data and the validation data.
