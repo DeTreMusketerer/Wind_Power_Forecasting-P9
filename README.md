@@ -58,8 +58,26 @@ scipy 1.7.2
   - New_Test_Data.mat
   - New_Training_Data.mat
   - New_Validation_Data.mat
+
+## Files:
+- data_energinet/
 - Learning/
 - models/
+- Modules/
+	- Import_Data.py
+	- sVARMAX_Module.py
+- Parallel_RNN.py
+- Multi_RNN.py
+- sARIMAX_validation.py
+- sARIMAX_test.py
+- sVARIMAX_validation.py
+- sVARIMAX_test.py
+
+## Modules:
+`Import_Data.py`
+	- Module with functionality used in Parallel_RNN and Multi_RNN to import and organise data.
+`sVARMAX_Module.py`
+	- Module containing the main class for estimation and forecasting with s-ARIMAX and s-VARIMAX models.
 
 ## Scripts:
 `Parrallel_RNN.py`
@@ -68,5 +86,14 @@ scipy 1.7.2
 `Multi_RNN.py`
 	- Script for training and testing multivariate LSTMs and GRUs.
 
-`Import_Data.py`
-	- Script containing functionality used Parallel_RNN and Multi_RNN.
+`sARIMAX_validation.py`
+	- Script for fitting and evaluating s-ARIMAX models using the subtraining data and the validation data.
+
+`sARIMAX_test.py`
+	- Script for fitting and evaluating s-ARIMAX models using the training data and the test data.
+
+`sVARIMAX_validation.py`
+	- Script for fitting and evaluating s-VARIMAX models using the subtraining data and the validation data.
+
+`sVARIMAX_test.py`
+	- Script for fitting and evaluating s-VARIMAX models using the training data and the test data.
