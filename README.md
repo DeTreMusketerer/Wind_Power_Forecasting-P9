@@ -76,6 +76,7 @@ scipy 1.7.2
 ## Modules:
 `Import_Data.py`
 	- Module with functionality used in Parallel_RNN and Multi_RNN to import and organise data.
+
 `sVARMAX_Module.py`
 	- Module containing the main class for estimation and forecasting with s-ARIMAX and s-VARIMAX models.
 
