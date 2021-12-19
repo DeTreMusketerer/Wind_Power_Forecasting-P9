@@ -18,7 +18,7 @@ numpy 1.21.2
 PyEMD 0.2.13
 pyarrow 5.0.0
 pandas 1.3.4
-pytourch 1.10
+pytorch 1.10
 datetime 3.9
 pyentrp 0.7.1
 scipy 1.7.2
