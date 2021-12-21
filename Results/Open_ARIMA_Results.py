@@ -21,12 +21,14 @@ from scipy.io import loadmat
 
 
 if __name__ == '__main__':
+    model = "model001_validation" # Give input here
+
+
     wind_areas = ["DK1-1", "DK1-2", "DK1-3", "DK1-4", "DK1-5", "DK1-6", "DK1-7", "DK1-8", "DK1-9", "DK1-10", "DK1-11", "DK1-12", "DK1-13", "DK1-14", "DK1-15", "DK2-1", "DK2-2", "DK2-3", "DK2-4", "DK2-5", "DK2-6"]
 
     tau_ahead = 1
     total_MSE = np.zeros((tau_ahead, 21))
     total_NMAE = np.zeros((tau_ahead, 21))
-    model = "model001_validation"
 
     fontsize = 12
     plt.style.use("seaborn-darkgrid")
@@ -38,8 +40,8 @@ if __name__ == '__main__':
 
     for l, area in enumerate(wind_areas):
         model_name = f"{model}_{area}"
-        save_path = f"s-ARIMAX/{model_name}"
-        mat = loadmat(save_path+".mat")
+        load_path = f"s-ARIMAX/{model_name}"
+        mat = loadmat(load_path+".mat")
         MSE = mat["MSE"]
         NMAE = mat["NMAE"]
         print(f"MSE {area}: {MSE[0, 0]}")

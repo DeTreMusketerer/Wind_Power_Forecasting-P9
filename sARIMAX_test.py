@@ -59,7 +59,7 @@ if __name__ == '__main__':
     m_s = 0
 
     r_part = 13
-    tau_ahead = 288
+    tau_ahead = 1
 
     for l, area in enumerate(wind_areas):
         model_name = f"{model}_{area}"

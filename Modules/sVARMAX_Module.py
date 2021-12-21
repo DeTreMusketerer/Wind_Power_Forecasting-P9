@@ -247,7 +247,20 @@ class sVARMAX(object):
 
         """
 
-        print("Fit a s-VARX({}) x ({})_{} model.".format(p, p_s, s))
+        if self.p_s == 0 and self.q_s == 0:
+            if self.d == 0:
+                print(f"Fit a VARX({p}) model.")
+            elif self.d == 1:
+                print(f"Fit a VARIMAX({p}, {self.d}, {0}) model.")
+            else:
+                raise AssertionError("Invalid differencing input. Options are d={0, 1}.")
+        else:
+            if self.d == 0:
+                print(f"Fit a s-VARX({p}) x ({p_s})_{s} model.")
+            elif self.d == 1:
+                print(f"Fit a s-VARIMAX({p}, {self.d}, {0}) x ({p_s}, {0}, {0})_{s} model.")
+            else:
+                raise AssertionError("Invalid differencing input. Options are d={0, 1}.")
 
         delay_list_AR = [j_s*s+j for j_s in range(p_s+1) for j in range(p+1)][1:]
         max_delay_AR = p_s*s + p
@@ -258,7 +271,12 @@ class sVARMAX(object):
 
         idx_list = []
 
-        for l in range(self.l, self.l+self.k):
+        if self.l == "all":
+            iter_l = 0
+        else:
+            iter_l = self.l
+
+        for l in range(iter_l, iter_l+self.k):
             idx = 0
             Y = np.zeros(self.n-2*288-(max_delay_AR*self.nr_missing_t), dtype=np.float32)
             X = np.zeros((self.n-2*288-(max_delay_AR*self.nr_missing_t), p_tot*self.k+self.r_part), dtype=np.float32)
@@ -337,8 +355,11 @@ class sVARMAX(object):
         # Step 1)
         _, _, _, u_hat = self.sVARX_fit(m, m_s, self.s)
 
-        print("Fit a s-VARMAX({}, {}) x ({}, {})_{} model.".format(
-            self.p, self.q, self.p_s, self.q_s, self.s))
+        if self.p_s == 0 and self.q_s == 0:
+            print(f"Fit a VARIMAX({self.p}, {self.d}, {self.q}) model.")
+        else:
+            print(f"Fit a s-VARIMAX({self.p}, {self.d}, {self.q}) x ({self.p_s}, {0}, {self.q_s})_{self.s} model.")
+
 
         # Step 2)
         delay_list_AR = [j_s*self.s+j for j_s in range(self.p_s+1) for j in range(self.p+1)][1:]
@@ -347,7 +368,12 @@ class sVARMAX(object):
         pars = np.zeros(((self.p_tot+self.q_tot)*self.k + self.r_part, self.k), dtype=np.float32)
         u_hat_new = np.zeros((self.n-2*288-(self.max_delay_AR*self.nr_missing_t), self.k), dtype=np.float32)
 
-        for l in range(self.l, self.l+self.k):
+        if self.l == "all":
+            iter_l = 0
+        else:
+            iter_l = self.l
+
+        for l in range(iter_l, iter_l+self.k):
             idx = 0
             Y = np.zeros(self.n-2*288-(self.max_delay_AR*self.nr_missing_t), dtype=np.float32)
             X = np.zeros((self.n-2*288-(self.max_delay_AR*self.nr_missing_t), (self.p_tot+self.q_tot)*self.k + self.r_part), dtype=np.float32)
@@ -621,7 +647,7 @@ class sVARMAX(object):
 
         """
         print("Commence testing...")
-        assert tau_ahead >= 1 and tau_ahead < 55
+        assert tau_ahead >= 1 and tau_ahead < 55*12
 
         # Store data
         y_test, test_missing_t = self.do_differencing(y_test.astype(dtype=np.float32), test_missing_t)

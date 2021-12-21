@@ -1,32 +1,37 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Nov 24 10:30:32 2021
 
-@author: marti
+Created on Fri Nov 26 10:02:12 2021
+
+Authors:  Andreas Anton Andersen, Martin Voigt Vejling, and Morten Stig Kaaber
+E-Mails: {aand17, mvejli17, mkaabe17}@student.aau.dk
+
+This script can be used to train and test s-VARIMAX models, see the report
+        Forecasting Wind Power Production
+            - Chapter 2: Time Series Analysis
+            - Chapter 6: Experimental Setup
+                - Section 6.2.4: s-VARIMAX
+
+The script has been developed using Python 3.9 with the
+libraries numpy and scipy.
+
 """
-
-import os
-import inspect
 
 import numpy as np
 from scipy.io import loadmat, savemat
 
-from sVARMAX_Module import sVARMAX_quick_fit
+from Modules.sVARMAX_Module import sVARMAX
 
 
 if __name__ == '__main__':
-    currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-    parentdir = os.path.dirname(currentdir)
+    Training_data = loadmat("data_energinet/New_Training_Data.mat")
 
-    np.random.seed(49)
-
-    Training_data = loadmat(parentdir+"/data_energinet/New_Training_Data.mat")
     train_y = Training_data["y"]
     train_z_NWP = Training_data["z_NWP"]
     train_z_reg = Training_data["z_reg"]
     missing_t_train = Training_data["missing_t"][0, :]
 
-    Test_data = loadmat(parentdir+"/data_energinet/New_Test_Data.mat")
+    Test_data = loadmat("data_energinet/New_Test_Data.mat")
     test_y = Test_data["y"][24:, :] # Need to start at 12:00:00 to match NWP
     test_z_NWP = Test_data["z_NWP"]
     test_z_reg = Test_data["z_reg"][24:, :]
@@ -35,12 +40,12 @@ if __name__ == '__main__':
 
     wind_areas = ["DK1-1", "DK1-2", "DK1-3", "DK1-4", "DK1-5", "DK1-6", "DK1-7", "DK1-8", "DK1-9", "DK1-10", "DK1-11", "DK1-12", "DK1-13", "DK1-14", "DK1-15", "DK2-1", "DK2-2", "DK2-3", "DK2-4", "DK2-5", "DK2-6"]
 
-    model = "model513_3_test"
+    model = "model001_test"
 
     # =============================================================================
     # Hyperparameters
     # =============================================================================
-    p = 12
+    p = 1
     q = 0
 
     d = 1
@@ -55,56 +60,26 @@ if __name__ == '__main__':
     m_s = 0
 
     r_part = 13
-    tau_ahead = 2
+    tau_ahead = 1
 
     model_name = model
-    save_path = "VARIMA_Results/"+model_name
+    save_path = f"Results/s-VARIMAX/{model_name}"
 
-    # =============================================================================
-    # Data Retrieval
-    # =============================================================================
-    if d == 1:
-        Power_train = train_y
-        y_train = Power_train[1:, :] - Power_train[:-1, :]
-        n_train = np.shape(y_train)[0]
-        missing_t_train[1:] = missing_t_train[1:]-1
-
-        Power_test = test_y
-        y_test = Power_test[1:, :] - Power_test[:-1, :]
-        n_test = np.shape(y_test)[0]
-        missing_t_test[1:] = missing_t_test[1:]-1
-
-        Training_data = {"y" : y_train, "z_NWP": train_z_NWP,
-                         "z_reg": train_z_reg, "missing_t" : missing_t_train}
-        Test_data = {"y" : y_test, "z_NWP": test_z_NWP,
-                     "z_reg": test_z_reg, "missing_t" : missing_t_test}
-    elif d == 0:
-        Power_train = train_y
-        y_train = Power_train
-
-        Power_test = test_y
-        y_test = Power_test
-
-        Training_data = {"y" : y_train, "z_NWP": train_z_NWP,
-                         "z_reg": train_z_reg, "missing_t" : missing_t_train}
-        Test_data = {"y" : y_test, "z_NWP": test_z_NWP,
-                     "z_reg": test_z_reg, "missing_t" : missing_t_test}
 
     # =============================================================================
     # Model Fit and Validation
     # =============================================================================
 
-    mod = sVARMAX_quick_fit(p, d, q, p_s, q_s, s, m, m_s, Training_data, r_part)
+    mod = sVARMAX(train_y, train_z_reg, train_z_NWP, np.copy(missing_t_train),
+                  p, d, q, p_s, q_s, s, m, m_s)
     mod.fit()
     Phi, Psi, Xi, Sigma_u = mod.return_parameters()
 
-    P_max = np.max(Power_train, axis=0)
+    P_max = np.max(test_y, axis=0)
+    Power_test = test_y
 
-    if d == 1:
-        MSE, NMAE, eps = mod.test_newer(tau_ahead, Test_data, P_max, 
-                                        Power_test)
-    elif d == 0:
-        MSE, NMAE, eps = mod.test_newer(tau_ahead, Test_data, P_max)
+    MSE, NMAE, eps = mod.test(tau_ahead, test_y, test_z_reg, test_z_NWP,
+                              np.copy(missing_t_test), P_max, Power_test)
 
     save_dict = {"Model": "s-VARIMAX({}, {}, {}) x ({}, {}, {})_{} with s-VARX({}) x ({})_{}".format(p, d, q, p_s, d_s, q_s, s, m, m_s, s),
                  "Xi": Xi, "Sigma_u": Sigma_u,
