@@ -63,6 +63,11 @@ scipy 1.7.2
 - data_energinet/
 - Learning/
 - models/
+- Results/
+	- s-ARIMAX
+	- s-VARIMAX
+	- Open_ARIMA_Results.py
+	- Open_VARIMA_Results.py
 - Modules/
 	- Import_Data.py
 	- sVARMAX_Module.py
