@@ -64,20 +64,20 @@ scipy 1.7.2
 - Learning/
 - models/
 - Results/
-	- s-ARIMAX
-	- s-VARIMAX
-	- Open_ARIMA_Results.py
-	- Open_VARIMA_Results.py
+	- s-ARIMAX/
+	- s-VARIMAX/
+	- `Open_ARIMA_Results.py`
+	- `Open_VARIMA_Results.py`
 - Modules/
-	- Import_Data.py
-	- sVARMAX_Module.py
-- Parallel_RNN.py
-- Multi_RNN.py
-- EMD_LSTM_ARMA.py
-- sARIMAX_validation.py
-- sARIMAX_test.py
-- sVARIMAX_validation.py
-- sVARIMAX_test.py
+	- `Import_Data.py`
+	- `sVARMAX_Module.py`
+- `Parallel_RNN.py`
+- `Multi_RNN.py`
+- `EMD_LSTM_ARMA.py`
+- `sARIMAX_validation.py`
+- `sARIMAX_test.py`
+- `sVARIMAX_validation.py`
+- `sVARIMAX_test.py`
 
 ## Modules:
 `Import_Data.py`
@@ -107,3 +107,9 @@ scipy 1.7.2
 
 `sVARIMAX_test.py`
 	- Script for fitting and evaluating s-VARIMAX models using the training data and the test data.
+
+`Open_ARIMA_Results.py`
+	- Script for opening and displaying the results made using the s-ARIMAX models.
+
+`Open_VARIMA_Results.py`
+	- Script for opening and displaying the results made using the s-VARIMAX models.
