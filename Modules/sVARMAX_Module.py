@@ -2,128 +2,212 @@
 """
 Created on Fri Nov 19 11:23:03 2021
 
-@author: marti
+Authors:  Andreas Anton Andersen, Martin Voigt Vejling, and Morten Stig Kaaber
+E-Mails: {aand17, mvejli17, mkaabe17}@student.aau.dk
+
+In this script the main functionality supporting the use of seasonal
+autoregressive integrated moving average models as described in the report
+        Forecasting Wind Power Production
+            - Chapter 2: Time Series Analysis
+
+This model class can be used to estimate parameters of s-ARIMAX and s-VARIMAX
+models using the scripts
+    - sARIMAX_validation
+    - sARIMAX_test
+    - sVARIMAX_validation
+    - sVARIMAX_test
+
+The script has been developed using Python 3.9 with the
+libraries numpy and scipy.
+
 """
 
-
-import os
-import inspect
-
 import numpy as np
-from scipy.io import loadmat, savemat
 from time import time
 
-from sVARMAX.sVARMAX_Core import sVARMAX_model_core
 
-#import line_profiler
-#profile = line_profiler.LineProfiler()
-
-
-class sVARMAX_quick_fit(sVARMAX_model_core):
+class sVARMAX(object):
     """
-    Compute parameters of a s-VARMAX model using OLS.
+
+    Main class for estimation and forecasting of s-VARIMAX(p, d, q) X (p_s, d_s, q_s)_s
+    models using OLS for quick and dirty fit of parameters.
+
+    Details regarding the models can be found in the report
+        Forecasting Wind Power Production
+            - Chapter 2: Time Series Analysis
+            - Chapter 6: Experimental Setup
+                - Section 6.2.2: s-ARIMAX
+                - Section 6.2.4: s-VARIMAX
+
     """
-    def __init__(self, p, d, q, p_s, q_s, s, m, m_s, data, r_part, l=0, other_z=False, EMD=False, reg=True):
+    def __init__(self, y, z_reg, z_NWP, missing_t, p=1, d=0, q=0, p_s=0, q_s=0, s=288,
+                 m=0, m_s=0, l="all", use_NWP=True, use_reg=True):
         """
+
         Parameters
         ----------
-        p : int
-            Autoregressive order.
-        q : int
-            Moving average order.
+        y : ndarray, size=(n, k)
+            Power data.
+        z_reg : ndarray, size=(n, 2)
+            Regulation data.
+        z_NWP : ndarray, size=(55, n_nwp, 11*k)
+            Numerical weather prediction data.
+        missing_t : ndarray
+            Array of time indices where a discontinuity in time is present due
+            to missing power history data. The first entry in the array is
+            zero and the last entry in the list is n.
+        p : int, optional
+            Autoregressive order. The default is 1.
         d : int
-            Order of differencing.
+            Order of differencing. Options are 0 and 1. The default is 0.
+        q : int
+            Moving average order. The default is 0.
         p_s : int, optional
-            Seasonal autoregressive order.
+            Seasonal autoregressive order. The default is 0.
         q_s : int, optional
-            Seasonal moving average order.
+            Seasonal moving average order. The default is 0.
         s : int, optional
-            Seasonal delay.
-        m : int
+            Seasonal delay. The default is 288.
+        m : int, optional
             Order of autoregressive model used for the initial parameter
-            estimate.
-        m_s : int
+            estimate. The default is 0.
+        m_s : int, optional
             Seasonal order for the autoregressive model used for the initial
-            parameter estimate.
-        data : dict
-            z_reg : ndarray, size=(n, 2)
-                Regulation data.
-            z_NWP : ndarray, size=(55, n_nwp, 11*k)
-                Numerical weather prediction data.
-            y : ndarray, size=(n, k)
-                Power data.
-            missing_t : ndarray
-                Array of time indices where a discontinuity in time is present due
-                to missing power history data. The first entry in the list is
-                zero and the last entry in the list is n.
-        r_data : int
-            Number of exogenous variables per wind area.
+            parameter estimate. The default is 0.
         l : int, optional
-            Wind area. The default is 0.
-        other_z : bool, optional
-            Whether or not to use my other z. The default is False.
-        EMD : bool, optional
-            If EMD, then don't use NWP data. The default is False.
-        """
-        # Store data
-        #self.store_data_pairs(data)
-        self.y = data["y"].astype(dtype=np.float32)
-        self.z_reg = data["z_reg"].astype(dtype=np.float32)
-        self.z_NWP = data["z_NWP"].astype(dtype=np.float32)
+            Sub-grid. Options are l = 0, \dots, 20. This input should be given
+            in the case of a univariate time series model. The default is "all".
+        use_NWP : bool, optional
+            Boolean variable to decide if numerical weather predictions (NWPs)
+            should be used as exogenous variables. The default is True.
+        use_reg : bool, optional
+            Boolean variable to decide if down-regulation
+            should be used as an exogenous variable. The default is True.
 
+        """
         # Initialize variables
-        self.n, self.k = np.shape(self.y)
-        self.r_part = r_part
-        self.r = self.k*self.r_part
+        self.use_reg = use_reg
+        self.use_NWP = use_NWP
 
         self.p = p
+        self.d = d
         self.q = q
         self.p_s = p_s
         self.q_s = q_s
         self.s = s
-        self.d = d
         self.l = l
         self.m = m
         self.m_s = m_s
+        if p_s == 0: assert m_s == 0
+        assert d == 0 or d == 1
+
+        # Store data
+        self.y, self.missing_t = self.do_differencing(y.astype(dtype=np.float32), missing_t)
+        self.nr_missing_t = len(self.missing_t)-1
+        if self.use_reg:
+            self.z_reg = z_reg.astype(dtype=np.float32)
+        else:
+            self.z_reg = None
+        if self.use_NWP:
+            self.z_NWP = z_NWP.astype(dtype=np.float32)
+        else:
+            self.z_NWP = None
+
+        # Initialize more variables
+        self.n, self.k = np.shape(self.y)
+        if self.use_NWP is True and self.use_reg is True:
+            self.r_part = 13
+        elif self.use_NWP is True and self.use_reg is False:
+            self.r_part = 12
+        elif self.use_NWP is False and self.use_reg is True:
+            self.r_part = 2
+        elif self.use_NWP is False and self.use_reg is False:
+            self.r_part = 1
+        else:
+            raise AssertionError("Invalid input(s) supplied to use_NWP and/or use_reg")
+        self.r = self.k*self.r_part
 
         self.max_delay_AR = p_s*s + p # The maximum delay in the autoregressive part
         self.max_delay_MA = q_s*s + q # The maximum delay in the moving average part
         self.max_delay = max(self.max_delay_AR, self.max_delay_MA) # The maximum delay
         self.p_tot = p+(p+1)*p_s # Total number of autoregressive delays
         self.q_tot = q+(q+1)*q_s # Total number of moving average delays
-        if self.max_delay_AR >= self.max_delay_MA:
-            self.xdim = self.max_delay_AR*self.k
-        elif self.max_delay_AR < self.max_delay_MA:
-            self.xdim = self.max_delay_MA*self.k
 
-        # Assertions
-        assert self.r_part*self.k == self.r or self.r_part == self.r
-        if p_s == 0: assert m_s == 0
-        if EMD is True and reg is True:
-            assert self.r == 2
-            assert other_z is False
-        elif EMD is True and reg is False:
-            assert self.r == 1
-            assert other_z is False            
-
-        # Missing data time indices
-        self.missing_t = data["missing_t"]
-        self.nr_missing_t = len(self.missing_t)-1
-
-        if EMD is True:
+        # Choose exogenous variable method
+        if self.use_NWP is False:
             self.make_z = self.make_EMD_z
-        elif other_z is True:
-            self.make_z = self.make_other_z
-        else:
+        elif self.use_NWP is True and self.use_reg is True:
             self.make_z = self.make_NWP_z
+        else:
+            raise AssertionError("This case is not supported.")
 
-    def fit(self, reg=True):
+    def do_differencing(self, y, missing_t):
+        """
+        Differencing for the power data. Note that differencing for the
+        exogenous variables are done in make_NWP_z().
+
+        Parameters
+        ----------
+        y : ndarray, size=(n, 21)
+            Wind power data.
+        missing_t : array
+            Array of time indices where a discontinuity in time is present due
+            to missing power history data. The first entry in the array is
+            zero and the last entry is n.
+
+        Returns
+        -------
+        y : ndarray, size(n, k)
+            Differenced wind power data.
+        missing_t : array
+            Array of time indices where a discontinuity in time is present due
+            to missing power history data for the differenced data.
+            The first entry in the array is zero and the last entry is n.
+
+        """
+        if self.d == 0:
+            if self.l != "all":
+                power = np.expand_dims(y[:, self.l], -1)
+                y = power
+        elif self.d == 1:
+            if self.l != "all":
+                power = np.expand_dims(y[:, self.l], -1)
+            elif self.l == "all":
+                power = y
+            y = power[1:, :] - power[:-1, :]
+            missing_t[1:] = missing_t[1:]-1
+        return y, missing_t
+
+    def update_parameters(self, Theta):
+        """
+
+        Updates the parameters using the dictionary Theta.
+
+        Save to self
+        -------
+        Psi, Psi, Xi, Sigma_u
+
+        """
+        self.Phi = Theta["Phi"]
+        if self.q != 0 or self.q_s != 0:
+            self.Psi = Theta["Psi"]
+        else:
+            self.Psi = []
+        self.Xi = Theta["Xi"]
+        self.Sigma_u = Theta["Sigma_u"]
+
+    def return_parameters(self):
+        return self.Phi, self.Psi, self.Xi, self.Sigma_u
+
+    def fit(self):
+        """
+
+        Conduct parameter estimation using OLS (quick and dirty).
+
+        """
         self.z = np.zeros((self.n, self.r))
         for t in range(self.n):
-            if reg is True:
-                self.z[t, :] = self.make_z(0, t, self.z_reg, self.z_NWP).astype(dtype=np.float32)
-            elif reg is False:
-                self.z[t, :] = self.make_z(0, t, self.z_reg, self.z_NWP, reg).astype(dtype=np.float32)
+            self.z[t, :] = self.make_z(0, t, self.z_reg, self.z_NWP).astype(dtype=np.float32)
 
         if self.q == 0:
             Xi, Phi, Sigma_u, _ = self.sVARX_fit(self.p, self.p_s, self.s)
@@ -132,12 +216,34 @@ class sVARMAX_quick_fit(sVARMAX_model_core):
             # Do initial parameter estimation
             Xi, Phi, Psi, Sigma_u = self.sVARMAX_fit(self.m, self.m_s)
             Theta = {"Phi": Phi, "Psi": Psi, "Xi": Xi, "Sigma_u": Sigma_u}
-
         self.update_parameters(Theta)
 
     def sVARX_fit(self, p, p_s, s):
         """
-        Fit a s-VARX(p) x (p_s)_s to x_hat using OLS.
+
+        Fit a s-VARX(p) x (p_s)_s using OLS.
+
+        Parameters
+        ----------
+        p : int
+            Autoregressive order.
+        p_s : int
+            Seasonal autoregressive order.
+        s : int
+            Seasonal delay.
+
+        Returns
+        -------
+        Xi : ndarray, size=(k, r)
+            Exogenous variable parameter matrix.
+        Phi : list, len=(p+(p+1)*p_s)
+            List of autoregressive parameter matrices given as
+            ndarrays of size=(k, k).
+        Sigma_u : ndarray, size=(k, k)
+            Covariance of white noise process.
+        u_hat : ndarray, size=(n, k)
+            Estimate of white noise process.
+
         """
 
         print("Fit a s-VARX({}) x ({})_{} model.".format(p, p_s, s))
@@ -196,16 +302,38 @@ class sVARMAX_quick_fit(sVARMAX_model_core):
 
     def sVARMAX_fit(self, m, m_s):
         """
+
         Fit s-VARMAX using OLS.
 
         1) Fit a s-VARX(m) x (m_s)_s for m >> p and m_s >> p_s model to y
            using OLS. Compute the residuals u_hat for the resulting model.
         2) Using u_hat do OLS to estimate the s-VARMAX(p, q) x (p_s, q_s)_s
            parameters.
-        """
 
+        Parameters
+        ----------
+        m : int
+            Autoregressive order for the s-VARX(m) x (m_s)_s in step 1).
+        m_s : int
+            Seasonal autoregressive order for the s-VARX(m) x (m_s)_s in step 1).
+
+        Returns
+        -------
+        Xi : ndarray, size=(k, r)
+            Exogenous variable parameter matrix.
+        Phi : list, len=(p_tot)
+            List of autoregressive parameter matrices given as
+            ndarrays of size=(k, k).
+        Psi : list, len=(q_tot)
+            List of moving average parameter matrices given as
+            ndarrays of size=(k, k).
+        Sigma_u : ndarray, size=(k, k)
+            Covariance of white noise process.
+
+        """
         if self.p_s != 0: assert self.s > m
 
+        # Step 1)
         _, _, _, u_hat = self.sVARX_fit(m, m_s, self.s)
 
         print("Fit a s-VARMAX({}, {}) x ({}, {})_{} model.".format(
@@ -259,6 +387,25 @@ class sVARMAX_quick_fit(sVARMAX_model_core):
         return Xi, Phi, Psi, Sigma_u
 
     def multivariate_OLS(self, Y, X):
+        """
+
+        Compute OLS for a multivariate regression problem.
+
+        Parameters
+        ----------
+        Y : ndarray, size=(n, k)
+            Target.
+        X : ndarray, size=(n, r)
+            Design matrix.
+
+        Returns
+        -------
+        B : ndarray, size=(r, k)
+            Parameter matrix.
+        eps : ndarray, size=(n, k)
+            Residuals.
+
+        """
         t1 = time()
         B = np.linalg.inv(X.T @ X) @ X.T @ Y
         t2 = time()
@@ -266,514 +413,7 @@ class sVARMAX_quick_fit(sVARMAX_model_core):
         eps = Y - X @ B
         return B, eps
 
-    # def tau_ahead_forecast(self, tau_ahead, t, test_data, P_test = None):
-    #     """
-    #     Compute the tau-ahead forecast using the truncated forecasting as
-    #     defined in property 3.7 of Shumway2017.
-
-    #     Parameters
-    #     ----------
-    #     tau_ahead : int
-    #         Compute tau-ahead forecast given time t-1.
-    #     t : int
-    #         Time index in the test set.
-    #     test_data : dict
-    #         y_test : ndarray, size=(n_test, k)
-    #             Endogenous variable.
-    #         z_NWP_test : ndarray, size=(tau_ahead, nwp_n_test, 11*k)
-    #             Numerical weather predictions with the given transformations.
-    #             The first axis is the tau_ahead axis while the second axis gives
-    #             a new set of NWP. The last axis is as follows:
-    #                 (T, sin(WD10m), cos(WD10m), sin(WD100m), cos(WD100m),
-    #                  WS10m, WS10m^2, WS10m^3, WS100m, WS100m^2, WS100m^3).
-    #         z_reg_test : ndarray, size=(n_test, 2)
-    #             Regulation data for DK1 in the first column and DK2 in the second
-    #             column.
-    #         test_missing_t : list
-    #             List of time indices where a discontinuity in time is present due
-    #             to missing power history data. The first entry in the list is
-    #             zero and the last entry in the list is n.
-    #     P_test : ndarray, size=(k, ), optional
-    #         Wind power at time t-2. Used when first order differencing is used.
-    #         The default is None.
-
-    #     Returns
-    #     -------
-    #     P_bar : ndarray, size=(tau_ahead, k)
-    #         Wind power forecast.
-    #     """
-
-    #     y_test = test_data["y"]
-    #     z_reg_test = test_data["z_reg"]
-    #     z_NWP_test = test_data["z_NWP"]
-    #     test_missing_t = test_data["missing_t"][0, :]
-
-    #     array_AR = np.array([j_s*self.s+j for j_s in range(self.p_s+1) for j in range(self.p+1)])[1:]
-    #     array_MA = np.array([i_s*self.s+i for i_s in range(self.q_s+1) for i in range(self.q+1)])[1:]
-
-    #     test_nr_missing_t = len(test_missing_t)-1
-    #     n_test, _ = y_test.shape
-
-    #     assert t >= self.max_delay
-    #     assert t < n_test - tau_ahead
-    #     if test_nr_missing_t == 2:
-    #         assert t >= test_missing_t[1] + self.max_delay or t < test_missing_t[1]-tau_ahead-288
-    #     else:
-    #         assert False
-
-    #     y_bar = np.zeros((tau_ahead, self.k))
-    #     if self.d == 1:
-    #         P_bar = np.zeros((tau_ahead, self.k))
-
-    #     idx_list = []
-
-    #     u_hat = np.zeros((n_test, self.k))
-    #     if t < test_missing_t[1]:
-    #         for t_i in range(self.max_delay, t+tau_ahead):
-    #             u_hat[t_i, :] += y_test[t_i, :]
-    #             for j, idx in enumerate(array_AR):
-    #                 u_hat[t_i, :] -= np.dot(self.Phi[j], y_test[t_i-idx, :])
-    #             for i, idx in enumerate(array_MA):
-    #                 u_hat[t_i, :] += np.dot(self.Psi[i], u_hat[t_i-idx, :])
-    #             z_data = self.make_z(0, t_i, z_reg_test, z_NWP_test)
-    #             u_hat[t_i, :] -= np.dot(self.Xi, z_data)
-    #     elif t > test_missing_t[1]:
-    #         for t_i in range(test_missing_t[1]+self.max_delay, t+tau_ahead):
-    #             u_hat[t_i, :] += y_test[t_i, :]
-    #             for j, idx in enumerate(array_AR):
-    #                 u_hat[t_i, :] -= np.dot(self.Phi[j], y_test[t_i-idx, :])
-    #             for i, idx in enumerate(array_MA):
-    #                 u_hat[t_i, :] += np.dot(self.Psi[i], u_hat[t_i-idx, :])
-    #             z_data = self.make_z(0, t_i, z_reg_test, z_NWP_test)
-    #             u_hat[t_i, :] -= np.dot(self.Xi, z_data)
-
-    #     # u_hat = self.estimate_noise_newer(tau_ahead, y_test, z_NWP_test,
-    #     #                                   z_reg_test, test_missing_t)
-
-    #     phi_mat = np.hstack(self.Phi)
-    #     if self.q != 0 or self.q_s != 0:
-    #         psi_mat = np.hstack(self.Psi)
-    #         beta = np.concatenate((phi_mat, -psi_mat, self.Xi), axis=1)
-    #     else:
-    #         beta = np.concatenate((phi_mat, self.Xi), axis=1)
-
-    #     # Compute the tau-ahead prediction for each time in the test set
-    #     for tau_i in range(tau_ahead):
-    #         if tau_i == 0:
-    #             idx_list.append(t)
-    #             y_vec = y_test[t-array_AR, :].flatten()
-    #             u_vec = u_hat[t-array_MA, :].flatten()
-    #             z_data = self.make_z(0, t, z_reg_test, z_NWP_test)
-    #             data_vec = np.hstack((y_vec, u_vec, z_data))
-    #             y_bar[0, :] = np.dot(beta, data_vec)
-    #         else:
-    #             bar_AR = array_AR[tau_i-array_AR >= 0]
-    #             test_AR = array_AR[tau_i-array_AR < 0]
-    #             hat_MA = array_MA[tau_i-array_MA < 0]
-    #             if len(bar_AR) != 0:
-    #                 y_vec_bar = y_bar[tau_i-bar_AR, :].flatten()
-    #             else:
-    #                 y_vec_bar = np.array([])
-    #             if len(test_AR) != 0:
-    #                 y_vec_test = y_test[t+tau_i-test_AR, :].flatten()
-    #             else:
-    #                 y_vec_test = np.array([])
-    #             if len(hat_MA) != 0:
-    #                 u_vec = u_hat[t+tau_i-hat_MA, :].flatten()
-    #             else:
-    #                 u_vec = np.array([])
-    #             y_bar[tau_i, :] += np.dot(phi_mat, np.hstack((y_vec_bar, y_vec_test)))
-    #             if self.q != 0 or self.q_s != 0:
-    #                 y_bar[tau_i, :] -= np.dot(psi_mat[:, (len(array_MA)-len(hat_MA))*self.k:], u_vec)
-    #             z_data = self.make_z(tau_i, t, z_reg_test, z_NWP_test)
-    #             y_bar[tau_i, :] += np.dot(self.Xi, z_data)
-
-    #         if self.d == 1:
-    #             for tau_i in range(tau_ahead):
-    #                 if tau_i == 0:
-    #                     P_bar[tau_i, :] = y_bar[tau_i, :] + P_test
-    #                 else:
-    #                     P_bar[tau_i, :] = y_bar[tau_i, :] + P_bar[tau_i-1, :]
-    #         else:
-    #             P_bar = y_bar
-
-    #     return P_bar
-
-    def forecast(self, tau_ahead, t_start, t_end, test_data, P_test = None):
-        """
-        Compute the one-ahead forecast using the truncated forecasting as
-        defined in property 3.7 of Shumway2017.
-
-        Parameters
-        ----------
-        tau_ahead : int
-            Compute tau-ahead forecast given time t-1.
-        t_start : int
-            Time index in the test set.
-        t_end : int
-            Time index in the test set to end.
-        test_data : dict
-            y_test : ndarray, size=(n_test, k)
-                Endogenous variable.
-            z_NWP_test : ndarray, size=(tau_ahead, nwp_n_test, 11*k)
-                Numerical weather predictions with the given transformations.
-                The first axis is the tau_ahead axis while the second axis gives
-                a new set of NWP. The last axis is as follows:
-                    (T, sin(WD10m), cos(WD10m), sin(WD100m), cos(WD100m),
-                     WS10m, WS10m^2, WS10m^3, WS100m, WS100m^2, WS100m^3).
-            z_reg_test : ndarray, size=(n_test, 2)
-                Regulation data for DK1 in the first column and DK2 in the second
-                column.
-            test_missing_t : list
-                List of time indices where a discontinuity in time is present due
-                to missing power history data. The first entry in the list is
-                zero and the last entry in the list is n.
-        P_test : ndarray, size=(n_test+1, k), optional
-            Wind power at time t-2. Used when first order differencing is used.
-            The default is None.
-
-        Returns
-        -------
-        P_bar : ndarray, size=(t_end-t_start, k)
-            Wind power forecast.
-        """
-
-        t_length = t_end-t_start
-        y_test = test_data["y"]
-        z_reg_test = test_data["z_reg"]
-        z_NWP_test = test_data["z_NWP"]
-        test_missing_t = test_data["missing_t"]
-
-        array_AR = np.array([j_s*self.s+j for j_s in range(self.p_s+1) for j in range(self.p+1)])[1:]
-        array_MA = np.array([i_s*self.s+i for i_s in range(self.q_s+1) for i in range(self.q+1)])[1:]
-
-        test_nr_missing_t = len(test_missing_t)-1
-        n_test, _ = y_test.shape
-
-        assert t_start >= self.max_delay
-        assert t_end < n_test
-        if test_nr_missing_t == 2:
-            assert t_start >= test_missing_t[1] + self.max_delay or t_end < test_missing_t[1]-288
-        else:
-            assert False
-
-        y_bar = np.zeros((tau_ahead, n_test, self.k))
-        if self.d == 1:
-            P_bar = np.zeros((tau_ahead, n_test, self.k))
-
-        phi_mat = np.hstack(self.Phi)
-        if self.q != 0 or self.q_s != 0:
-            psi_mat = np.hstack(self.Psi)
-            beta = np.concatenate((phi_mat, -psi_mat, self.Xi), axis=1)
-        else:
-            beta = np.concatenate((phi_mat, self.Xi), axis=1)
-
-        u_hat = np.zeros((n_test, self.k))
-        if t_start < test_missing_t[1]:
-            a = self.max_delay
-        else:
-            a = test_missing_t[1]+self.max_delay
-
-        for tau_i in range(tau_ahead):
-            for t in range(a, t_end):
-                if tau_i == 0:
-                    z_data = self.make_z(0, t, z_reg_test, z_NWP_test)
-                    y_vec = y_test[t-array_AR, :].flatten()
-                    u_vec = u_hat[t-array_MA, :].flatten()
-                    data_vec = np.hstack((y_vec, u_vec, z_data))
-                    y_bar[0, t, :] = np.dot(beta, data_vec)
-
-                    u_hat[t, :] += y_test[t, :]
-                    for j, idx in enumerate(array_AR):
-                        u_hat[t, :] -= np.dot(self.Phi[j], y_test[t-idx, :])
-                    for i, idx in enumerate(array_MA):
-                        u_hat[t, :] += np.dot(self.Psi[i], u_hat[t-idx, :])
-                    u_hat[t, :] -= np.dot(self.Xi, z_data)
-                else:
-                    bar_AR = array_AR[tau_i-array_AR >= 0]
-                    test_AR = array_AR[tau_i-array_AR < 0]
-                    hat_MA = array_MA[tau_i-array_MA < 0]
-                    if len(bar_AR) != 0:
-                        y_vec_bar = y_bar[tau_i-bar_AR, t, :].flatten()
-                    else:
-                        y_vec_bar = np.array([])
-                    if len(test_AR) != 0:
-                        y_vec_test = y_test[t+tau_i-test_AR, :].flatten()
-                    else:
-                        y_vec_test = np.array([])
-                    if len(hat_MA) != 0:
-                        u_vec = u_hat[t+tau_i-hat_MA, :].flatten()
-                    else:
-                        u_vec = np.array([])
-                    y_bar[tau_i, t, :] += np.dot(phi_mat, np.hstack((y_vec_bar, y_vec_test)))
-                    if self.q != 0 or self.q_s != 0:
-                        y_bar[tau_i, t, :] -= np.dot(psi_mat[:, (len(array_MA)-len(hat_MA))*self.k:], u_vec)
-                    z_data = self.make_z(tau_i, t, z_reg_test, z_NWP_test)
-                    y_bar[tau_i, t, :] += np.dot(self.Xi, z_data)
-
-                if self.d == 1:
-                    if tau_i == 0:
-                        P_bar[0, t, :] = y_bar[0, t, :] + P_test[t, :]
-                    else:
-                        P_bar[tau_i, t, :] =  y_bar[tau_i, t, :] + P_bar[tau_i-1, t, :]
-                else:
-                    P_bar = y_bar
-
-        return P_bar[tau_ahead-1, t_start-tau_ahead:t_end-tau_ahead, :]
-
-
-    #@profile
-    def test_newer(self, tau_ahead, test_data, P_max, P_test=None):
-        """
-        Same as self.test_new(), however this function uses the correct
-        exogenous variables.
-
-        Parameters
-        ----------
-        tau_ahead : int
-            Compute tau-ahead forecast given time t-1.
-        test_data : dict
-            y_test : ndarray, size=(n_test, k)
-                Endogenous variable.
-            z_NWP_test : ndarray, size=(tau_ahead, nwp_n_test, 11*k)
-                Numerical weather predictions with the given transformations.
-                The first axis is the tau_ahead axis while the second axis gives
-                a new set of NWP. The last axis is as follows:
-                    (T, sin(WD10m), cos(WD10m), sin(WD100m), cos(WD100m),
-                     WS10m, WS10m^2, WS10m^3, WS100m, WS100m^2, WS100m^3).
-            z_reg_test : ndarray, size=(n_test, 2)
-                Regulation data for DK1 in the first column and DK2 in the second
-                column.
-            test_missing_t : list
-                List of time indices where a discontinuity in time is present due
-                to missing power history data. The first entry in the list is
-                zero and the last entry in the list is n.
-        P_max : ndarray, size=(k,)
-            Maximum wind power measured in the training data for each wind
-            area.
-        P_test : ndarray, size=(k,), optional
-            Wind power at time t-2. Used when first order differencing is used.
-            The default is None.
-
-        Returns
-        -------
-        MSE : ndarray, size=(tau_ahead, k)
-            Mean squared error of wind power forecast.
-        NMAE : ndarray, size=(tau_ahead, k)
-            Normalised mean absolute error of wind power forecast.
-        eps : ndarray, size=(tau_ahead, n_test, k)
-            Residuals of wind power forecast.
-        """
-        print("Commence testing...")
-
-        y_test = test_data["y"]
-        z_reg_test = test_data["z_reg"]
-        z_NWP_test = test_data["z_NWP"]
-        test_missing_t = test_data["missing_t"]
-
-        array_AR = np.array([j_s*self.s+j for j_s in range(self.p_s+1) for j in range(self.p+1)])[1:]
-        array_MA = np.array([i_s*self.s+i for i_s in range(self.q_s+1) for i in range(self.q+1)])[1:]
-
-        test_nr_missing_t = len(test_missing_t)-1
-        n_test, _ = y_test.shape
-
-        y_bar = np.zeros((tau_ahead, n_test, self.k))
-        if self.d == 1:
-            P_bar = np.zeros((tau_ahead, n_test, self.k))
-
-        idx_list = []
-
-        u_hat = self.estimate_noise_newer(tau_ahead, y_test, z_NWP_test,
-                                          z_reg_test, test_missing_t)
-
-        phi_mat = np.hstack(self.Phi)
-        if self.q != 0 or self.q_s != 0:
-            psi_mat = np.hstack(self.Psi)
-            beta = np.concatenate((phi_mat, -psi_mat, self.Xi), axis=1)
-        else:
-            beta = np.concatenate((phi_mat, self.Xi), axis=1)
-
-        # Compute the tau-ahead prediction for each time in the test set
-        for tau_i in range(tau_ahead):
-            #if tau_i > 0:
-            #    z_test = self.make_z_test(0, z_NWP_test, z_reg_test, d=d, l=l)
-            if tau_i % 20 == 0:
-                print("Tau ahead: {}".format(tau_i))
-            for missing_t_idx in range(test_nr_missing_t):
-                a = test_missing_t[missing_t_idx]+self.max_delay
-                if missing_t_idx < test_nr_missing_t-1:
-                    b = test_missing_t[missing_t_idx+1]-tau_ahead-288
-                else:
-                    b = test_missing_t[missing_t_idx+1]-tau_ahead
-                for t in range(a, b):
-                    if tau_i == 0:
-                        idx_list.append(t)
-                        y_vec = y_test[t-array_AR, :].flatten()
-                        u_vec = u_hat[t-array_MA, :].flatten()
-                        z_data = self.make_z(0, t, z_reg_test, z_NWP_test)
-                        data_vec = np.hstack((y_vec, u_vec, z_data))
-                        y_bar[0, t, :] = np.dot(beta, data_vec)
-                    else:
-                        bar_AR = array_AR[tau_i-array_AR >= 0]
-                        test_AR = array_AR[tau_i-array_AR < 0]
-                        hat_MA = array_MA[tau_i-array_MA < 0]
-                        if len(bar_AR) != 0:
-                            y_vec_bar = y_bar[tau_i-bar_AR, t, :].flatten()
-                        else:
-                            y_vec_bar = np.array([])
-                        if len(test_AR) != 0:
-                            y_vec_test = y_test[t+tau_i-test_AR, :].flatten()
-                        else:
-                            y_vec_test = np.array([])
-                        if len(hat_MA) != 0:
-                            u_vec = u_hat[t+tau_i-hat_MA, :].flatten()
-                        else:
-                            u_vec = np.array([])
-                        y_bar[tau_i, t, :] += np.dot(phi_mat, np.hstack((y_vec_bar, y_vec_test)))
-                        if self.q != 0 or self.q_s != 0:
-                            y_bar[tau_i, t, :] -= np.dot(psi_mat[:, (len(array_MA)-len(hat_MA))*self.k:], u_vec)
-                        z_data = self.make_z(tau_i, t, z_reg_test, z_NWP_test)
-                        y_bar[tau_i, t, :] += np.dot(self.Xi, z_data)
-
-                    if self.d == 1:
-                        for tau_i_2 in range(tau_ahead):
-                            if tau_i_2 == 0:
-                                P_bar[tau_i_2, t, :] = y_bar[tau_i_2, t, :] + P_test[t, :]
-                            else:
-                                P_bar[tau_i_2, t, :] = y_bar[tau_i_2, t, :] + P_bar[tau_i_2-1, t, :]
-
-        idx_array = np.array(idx_list)
-        eps = np.zeros((tau_ahead, len(idx_list), self.k))
-        for tau_i in range(tau_ahead):
-            if self.d == 0:
-                eps[tau_i, :, :] = y_bar[tau_i, idx_array, :] - y_test[idx_array+tau_i, :]
-            elif self.d == 1:
-                eps[tau_i, :, :] = P_bar[tau_i, idx_array, :] - P_test[idx_array+tau_i+1, :]
-
-        MSE = np.mean(eps**2, axis=1)
-        NMAE = np.mean(np.abs(eps), axis=1)/P_max
-        #profile.print_stats()
-        return MSE, NMAE, eps
-
-    #@profile
-    def EMD_test(self, tau_ahead, test_data, reg=True):
-        """
-        Same as self.test_new(), however this function uses the correct
-        exogenous variables.
-
-        Parameters
-        ----------
-        tau_ahead : int
-            Compute tau-ahead forecast given time t-1.
-        test_data : dict
-            y_test : ndarray, size=(n_test, k)
-                Endogenous variable.
-            z_reg_test : ndarray, size=(n_test, 2)
-                Regulation data for DK1 in the first column and DK2 in the second
-                column.
-            test_missing_t : list
-                List of time indices where a discontinuity in time is present due
-                to missing power history data. The first entry in the list is
-                zero and the last entry in the list is n.
-
-        Returns
-        -------
-        MSE : ndarray, size=(tau_ahead, k)
-            Mean squared error of wind power forecast.
-        eps : ndarray, size=(tau_ahead, n_test, k)
-            Residuals of wind power forecast.
-        """
-
-        assert self.d == 0
-        print("Commence testing...")
-
-        y_test = test_data["y"]
-        z_reg_test = test_data["z_reg"]
-        test_missing_t = test_data["missing_t"]
-
-        array_AR = np.array([j_s*self.s+j for j_s in range(self.p_s+1) for j in range(self.p+1)])[1:]
-        array_MA = np.array([i_s*self.s+i for i_s in range(self.q_s+1) for i in range(self.q+1)])[1:]
-
-        test_nr_missing_t = len(test_missing_t)-1
-        n_test, _ = y_test.shape
-
-        y_bar = np.zeros((tau_ahead, n_test, self.k))
-
-        idx_list = []
-
-        if reg is True:
-            u_hat = self.estimate_noise_newer(tau_ahead, y_test, None,
-                                              z_reg_test, test_missing_t)
-        elif reg is False:
-            u_hat = self.estimate_noise_newer(tau_ahead, y_test, None,
-                                              z_reg_test, test_missing_t, reg)
-
-        phi_mat = np.hstack(self.Phi)
-        if self.q != 0 or self.q_s != 0:
-            psi_mat = np.hstack(self.Psi)
-            beta = np.concatenate((phi_mat, -psi_mat, self.Xi), axis=1)
-        else:
-            beta = np.concatenate((phi_mat, self.Xi), axis=1)
-
-        # Compute the tau-ahead prediction for each time in the test set
-        for tau_i in range(tau_ahead):
-            #if tau_i > 0:
-            #    z_test = self.make_z_test(0, z_NWP_test, z_reg_test, d=d, l=l)
-            if tau_i % 20 == 0:
-                print("Tau ahead: {}".format(tau_i))
-            for missing_t_idx in range(test_nr_missing_t):
-                a = test_missing_t[missing_t_idx]+self.max_delay
-                if missing_t_idx < test_nr_missing_t-1:
-                    b = test_missing_t[missing_t_idx+1]-tau_ahead-288
-                else:
-                    b = test_missing_t[missing_t_idx+1]-tau_ahead
-                for t in range(a, b):
-                    if tau_i == 0:
-                        idx_list.append(t)
-                        y_vec = y_test[t-array_AR, :].flatten()
-                        u_vec = u_hat[t-array_MA, :].flatten()
-                        if reg is True:
-                            z_data = self.make_z(0, t, z_reg_test, None)
-                        elif reg is False:
-                            z_data = self.make_z(0, t, z_reg_test, None, reg)
-                        data_vec = np.hstack((y_vec, u_vec, z_data))
-                        y_bar[0, t, :] = np.dot(beta, data_vec)
-                    else:
-                        bar_AR = array_AR[tau_i-array_AR >= 0]
-                        test_AR = array_AR[tau_i-array_AR < 0]
-                        hat_MA = array_MA[tau_i-array_MA < 0]
-                        if len(bar_AR) != 0:
-                            y_vec_bar = y_bar[tau_i-bar_AR, t, :].flatten()
-                        else:
-                            y_vec_bar = np.array([])
-                        if len(test_AR) != 0:
-                            y_vec_test = y_test[t+tau_i-test_AR, :].flatten()
-                        else:
-                            y_vec_test = np.array([])
-                        if len(hat_MA) != 0:
-                            u_vec = u_hat[t+tau_i-hat_MA, :].flatten()
-                        else:
-                            u_vec = np.array([])
-                        y_bar[tau_i, t, :] += np.dot(phi_mat, np.hstack((y_vec_bar, y_vec_test)))
-                        if self.q != 0 or self.q_s != 0:
-                            y_bar[tau_i, t, :] -= np.dot(psi_mat[:, (len(array_MA)-len(hat_MA))*self.k:], u_vec)
-                        if reg is True:
-                            z_data = self.make_z(tau_i, t, z_reg_test, None)
-                        elif reg is False:
-                            z_data = self.make_z(tau_i, t, z_reg_test, None, reg)
-                        y_bar[tau_i, t, :] += np.dot(self.Xi, z_data)
-
-
-        idx_array = np.array(idx_list)
-        eps = np.zeros((tau_ahead, n_test, self.k))
-        for tau_i in range(tau_ahead):
-            eps[tau_i, idx_array, :] = y_bar[tau_i, idx_array, :] - y_test[idx_array+tau_i, :]
-
-        MSE = np.mean(eps[:, idx_array, :]**2, axis=1)
-        #profile.print_stats()
-        return MSE, eps
-
-    def estimate_noise_newer(self, tau_ahead, y_test, z_NWP_test, z_reg_test, test_missing_t, reg=True):
+    def estimate_noise(self, tau_ahead, y_test, z_NWP_test, z_reg_test, test_missing_t, reg=True):
         """
         Parameters
         ----------
@@ -826,28 +466,191 @@ class sVARMAX_quick_fit(sVARMAX_model_core):
                 u_hat[t, :] -= np.dot(self.Xi, z_data)
         return u_hat
 
-    def z_NWP_index(self, tau_i, t):
+    def forecast(self, tau_ahead, y_test, z_reg_test, z_NWP_test,
+                 test_missing_t, P_test = None):
         """
-        Determine the indices to extract NWP data given the indices for the
-        power data.
+
+        Compute the tau-ahead forecast using the truncated forecasting as
+        defined in property 3.7 of Shumway2017.
 
         Parameters
         ----------
-        tau_i : int
-            tau-ahead prediction.
-        t : int
-            Time index.
+        tau_ahead : int
+            Compute tau-ahead forecast t+tau given time t-1.
+        y_test : ndarray, size=(n_test, k)
+            Endogenous variable.
+        z_reg_test : ndarray, size=(n_test, 2)
+            Regulation data for DK1 in the first column and DK2 in the second
+            column.
+        z_NWP_test : ndarray, size=(tau_ahead, nwp_n_test, 11*k)
+            Numerical weather predictions with the given transformations.
+            The first axis is the tau_ahead axis while the second axis gives
+            a new set of NWP. The last axis is as follows:
+                (T, sin(WD10m), cos(WD10m), sin(WD100m), cos(WD100m),
+                 WS10m, WS10m^2, WS10m^3, WS100m, WS100m^2, WS100m^3).
+        test_missing_t : list
+            List of time indices where a discontinuity in time is present due
+            to missing power history data. The first entry in the list is
+            zero and the last entry in the list is n.
+        P_test : ndarray, size=(n_test+1, k), optional
+            Wind power at time t-2. Used when first order differencing is used.
+            The default is None.
 
         Returns
         -------
-        nwp_tau_i : int
-            tau index for z_NWP.
-        nwp_t : int
-            Time index for z_NWP.
+        P_bar : ndarray, size=(t_end-t_start, k)
+            Wind power forecast.
+        idx_list : list
+            List containing the indices for which forecasts are made. This
+            is needed due to the missing data.
+
         """
-        nwp_t, remainder1 = divmod(t, 36)
-        nwp_tau_i, remainder2 = divmod(remainder1+tau_i, 12)
-        return nwp_tau_i, nwp_t
+
+        array_AR = np.array([j_s*self.s+j for j_s in range(self.p_s+1) for j in range(self.p+1)])[1:]
+        array_MA = np.array([i_s*self.s+i for i_s in range(self.q_s+1) for i in range(self.q+1)])[1:]
+
+        test_nr_missing_t = len(test_missing_t)-1
+        n_test, _ = y_test.shape
+
+        y_bar = np.zeros((tau_ahead, n_test, self.k))
+        if self.d == 1:
+            P_bar = np.zeros((tau_ahead, n_test, self.k))
+
+        phi_mat = np.hstack(self.Phi)
+        if self.q != 0 or self.q_s != 0:
+            psi_mat = np.hstack(self.Psi)
+            beta = np.concatenate((phi_mat, -psi_mat, self.Xi), axis=1)
+        else:
+            beta = np.concatenate((phi_mat, self.Xi), axis=1)
+
+        u_hat = self.estimate_noise(tau_ahead, y_test, z_NWP_test,
+                                    z_reg_test, test_missing_t)
+
+        idx_list = []
+
+        for tau_i in range(tau_ahead):
+            if tau_i % 20 == 0:
+                print("Tau ahead: {}".format(tau_i))
+            for missing_t_idx in range(test_nr_missing_t):
+                a = test_missing_t[missing_t_idx]+self.max_delay
+                if missing_t_idx < test_nr_missing_t-1:
+                    b = test_missing_t[missing_t_idx+1]-tau_ahead-288
+                else:
+                    b = test_missing_t[missing_t_idx+1]-tau_ahead
+                for t in range(a, b):
+                    if tau_i == 0:
+                        idx_list.append(t)
+                        z_data = self.make_z(0, t, z_reg_test, z_NWP_test)
+                        y_vec = y_test[t-array_AR, :].flatten()
+                        u_vec = u_hat[t-array_MA, :].flatten()
+                        data_vec = np.hstack((y_vec, u_vec, z_data))
+                        y_bar[0, t, :] = np.dot(beta, data_vec)
+                    else:
+                        bar_AR = array_AR[tau_i-array_AR >= 0]
+                        test_AR = array_AR[tau_i-array_AR < 0]
+                        hat_MA = array_MA[tau_i-array_MA < 0]
+                        if len(bar_AR) != 0:
+                            y_vec_bar = y_bar[tau_i-bar_AR, t, :].flatten()
+                        else:
+                            y_vec_bar = np.array([])
+                        if len(test_AR) != 0:
+                            y_vec_test = y_test[t+tau_i-test_AR, :].flatten()
+                        else:
+                            y_vec_test = np.array([])
+                        if len(hat_MA) != 0:
+                            u_vec = u_hat[t+tau_i-hat_MA, :].flatten()
+                        else:
+                            u_vec = np.array([])
+                        y_bar[tau_i, t, :] += np.dot(phi_mat, np.hstack((y_vec_bar, y_vec_test)))
+                        if self.q != 0 or self.q_s != 0:
+                            y_bar[tau_i, t, :] -= np.dot(psi_mat[:, (len(array_MA)-len(hat_MA))*self.k:], u_vec)
+                        z_data = self.make_z(tau_i, t, z_reg_test, z_NWP_test)
+                        y_bar[tau_i, t, :] += np.dot(self.Xi, z_data)
+
+                    if self.d == 1:
+                        if tau_i == 0:
+                            P_bar[0, t, :] = y_bar[0, t, :] + P_test[t, :]
+                        else:
+                            P_bar[tau_i, t, :] =  y_bar[tau_i, t, :] + P_bar[tau_i-1, t, :]
+                    else:
+                        P_bar = y_bar
+        return P_bar, idx_list
+
+    def test(self, tau_ahead, y_test, z_reg_test, z_NWP_test, test_missing_t,
+             P_max, P_test=None):
+        """
+
+        Test function. This function assumes the parameters have been fitted
+        using self.fit(). The functionality mainly relies on self.forecast().
+
+        Parameters
+        ----------
+        tau_ahead : int
+            Compute tau-ahead forecast t+tau given time t-1.
+        y_test : ndarray, size=(n_test, k)
+            Endogenous variable.
+        z_reg_test : ndarray, size=(n_test, 2)
+            Regulation data for DK1 in the first column and DK2 in the second
+            column.
+        z_NWP_test : ndarray, size=(tau_ahead, nwp_n_test, 11*k)
+            Numerical weather predictions with the given transformations.
+            The first axis is the tau_ahead axis while the second axis gives
+            a new set of NWP. The last axis is as follows:
+                (T, sin(WD10m), cos(WD10m), sin(WD100m), cos(WD100m),
+                 WS10m, WS10m^2, WS10m^3, WS100m, WS100m^2, WS100m^3).
+        test_missing_t : list
+            List of time indices where a discontinuity in time is present due
+            to missing power history data. The first entry in the list is
+            zero and the last entry in the list is n.
+        P_max : ndarray, size=(k,)
+            Maximum wind power measured in the training data for each wind
+            area.
+        P_test : ndarray, size=(k,), optional
+            Wind power at time t-2. Used when first order differencing is used.
+            The default is None.
+
+        Returns
+        -------
+        MSE : ndarray, size=(tau_ahead, k)
+            Mean squared error of wind power forecast.
+        NMAE : ndarray, size=(tau_ahead, k)
+            Normalised mean absolute error of wind power forecast.
+        eps : ndarray, size=(tau_ahead, n_test, k)
+            Residuals of wind power forecast.
+
+        """
+        print("Commence testing...")
+        assert tau_ahead >= 1 and tau_ahead < 55
+
+        if self.d == 0:
+            P_test = y_test.astype(dtype=np.float32)
+
+        # Store data
+        y_test, test_missing_t = self.do_differencing(y_test.astype(dtype=np.float32), test_missing_t)
+        if self.use_reg:
+            z_reg_test = z_reg_test.astype(dtype=np.float32)
+        else:
+            z_reg_test = None
+        if self.use_NWP:
+            z_NWP_test = z_NWP_test.astype(dtype=np.float32)
+        else:
+            z_NWP_test = None
+
+        P_bar, idx_list = self.forecast(tau_ahead, y_test, z_reg_test, z_NWP_test,
+                                        test_missing_t, P_test)
+
+        idx_array = np.array(idx_list)
+        eps = np.zeros((tau_ahead, len(idx_list), self.k))
+        for tau_i in range(tau_ahead):
+            if self.d == 0:
+                eps[tau_i, :, :] = P_bar[tau_i, idx_array, :] - P_test[idx_array+tau_i, :]
+            elif self.d == 1:
+                eps[tau_i, :, :] = P_bar[tau_i, idx_array, :] - P_test[idx_array+tau_i+1, :]
+
+        print(f"Residual shape: {eps.shape}")
+        MSE = np.mean(eps**2, axis=1)
+        NMAE = np.mean(np.abs(eps), axis=1)/P_max
+        return MSE, NMAE, eps
 
     def make_NWP_z(self, tau_i, t, z_reg, z_NWP):
         """
@@ -922,11 +725,11 @@ class sVARMAX_quick_fit(sVARMAX_model_core):
                     z_data[nwp_list] = np.zeros(11*21)
         return z_data
 
-    def make_other_z(self, tau_i, t, z_reg, z_NWP, is_this_test=False):
+    def make_EMD_z(self, tau_i, t, z_reg, z_NWP=None):
         """
         Function to make a z_data vector in a numpy array given a time
-        (tau_i, t) and the exogenous variables z_reg as well as
-        the order of differencing d.
+        (tau_i, t) and the exogenous variables z_reg. The exogenous variables
+        consists of a 1 giving a bias term, and the down-regulation.
 
         Parameters
         ----------
@@ -936,198 +739,21 @@ class sVARMAX_quick_fit(sVARMAX_model_core):
             Time index.
         z_reg : ndarray, size=(n, 2)
             Regulations data ordered as (dk1, dk2).
-        is_this_test : bool, optional
-            The test data starts at 10 am while training and validation
-             starts at 0 am. Hence, for time of day a shift is 
-             needed for the test data. The default is False.
-
-        Returns
-        -------
-        z_data : ndarray, size=(4,)
-            Exogenous variable vector.
-        """
-        if is_this_test is True:
-            time_of_day = t-12*10
-        else:
-            time_of_day = t
-
-        if self.d == 1:
-            t += 1
-        z_data = np.zeros(self.r)
-        if self.d == 0:
-            if self.k == 1:
-                z_data[0] = 1
-                if self.l < 15:
-                    z_data[1] = z_reg[t+tau_i, 0]
-                else:
-                    z_data[1] = z_reg[t+tau_i, 1]
-                z_data[2] = np.sin(2*np.pi*time_of_day/288)
-                z_data[3] = np.cos(2*np.pi*time_of_day/288)
-            elif self.k == 21:
-                bias_list = [i for i in range(0, self.r, self.r_part)]
-                z_data[bias_list] = np.ones(len(bias_list))
-                reg1_list = [i for i in range(1, self.r_part*15, self.r_part)]
-                reg2_list = [i for i in range(self.r_part*15+1, self.r, self.r_part)]
-                z_data[reg1_list] = np.repeat(z_reg[t+tau_i, 0], 15)
-                z_data[reg2_list] = np.repeat(z_reg[t+tau_i, 1], 6)
-                time_of_day_list = [i for i in range(self.r) if i not in bias_list and i not in reg1_list and i not in reg2_list]
-                z_data[time_of_day_list] = np.repeat(np.hstack((np.sin(2*np.pi*time_of_day/288), np.cos(2*np.pi*time_of_day/288))), 21)
-        elif self.d == 1:
-            if self.k == 1:
-                z_data[0] = 1
-                if self.l < 15:
-                    z_data[1] = z_reg[t+tau_i, 0] - z_reg[t+tau_i-1, 0]
-                else:
-                    z_data[1] = z_reg[t+tau_i, 1] - z_reg[t+tau_i-1, 1]
-                z_data[2] = np.sin(2*np.pi*time_of_day/288)
-                z_data[3] = np.cos(2*np.pi*time_of_day/288)
-            elif self.k == 21:
-                bias_list = [i for i in range(0, self.r, self.r_part)]
-                z_data[bias_list] = np.ones(len(bias_list))
-                reg1_list = [i for i in range(1, self.r_part*15, self.r_part)]
-                reg2_list = [i for i in range(self.r_part*15+1, self.r, self.r_part)]
-                z_data[reg1_list] = np.repeat(z_reg[t+tau_i, 0] - z_reg[t+tau_i-1, 0], 15)
-                z_data[reg2_list] = np.repeat(z_reg[t+tau_i, 1] - z_reg[t+tau_i-1, 1], 6)
-                time_of_day_list = [i for i in range(self.r) if i not in bias_list and i not in reg1_list and i not in reg2_list]
-                z_data[time_of_day_list] = np.repeat(np.hstack((np.sin(2*np.pi*time_of_day/288), np.cos(2*np.pi*time_of_day/288))), 21)
-        return z_data
-
-    def make_EMD_z(self, tau_i, t, z_reg, z_NWP, reg=True):
-        """
-        Function to make a z_data vector in a numpy array given a time
-        (tau_i, t) and the exogenous variables z_reg.
-
-        Parameters
-        ----------
-        tau_i : int
-            tau_i-ahead prediction index.
-        t : int
-            Time index.
-        z_reg : ndarray, size=(n, 2)
-            Regulations data ordered as (dk1, dk2).
+        z_NWP :
+            Dummy variable to make make_EMD_a and make_NWP_z compatible.
 
         Returns
         -------
         z_data : ndarray, size=(2,)
             Exogenous variable vector.
         """
+        if self.d != 0: raise AssertionError("Differencing is implemented for this case.")
         z_data = np.zeros(self.r)
         z_data[0] = 1
-        if reg is True:
+        if self.use_reg is True:
             if self.l < 15:
                 z_data[1] = z_reg[t+tau_i, 0]
             else:
                 z_data[1] = z_reg[t+tau_i, 1]
         return z_data
-
-if __name__ == '__main__':
-    currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-    parentdir = os.path.dirname(currentdir)
-
-    np.random.seed(49)
-
-    Training_data = loadmat(parentdir+"/data_energinet/Training_data_TS.mat")
-    Train_y = Training_data["y"]
-    Train_z = Training_data["z"]
-
-    wind_areas = ["DK1-1", "DK1-2", "DK1-3", "DK1-4", "DK1-5", "DK1-6", "DK1-7", "DK1-8", "DK1-9", "DK1-10", "DK1-11", "DK1-12", "DK1-13", "DK1-14", "DK1-15", "DK2-1", "DK2-2", "DK2-3", "DK2-4", "DK2-5", "DK2-6"]
-
-    model = "model002"
-
-    # =============================================================================
-    # Hyperparameters
-    # =============================================================================
-    p = 10
-    q = 0
-
-    d = 1
-    d_s = 0
-
-    p_s = 0
-    q_s = 0
-
-    s = 288
-
-    m = 12
-    m_s = 0
-
-    r_part = 13
-
-    l = 0
-    area = wind_areas[l]
-    model_name = model+"_"+area
-    save_path = "ARIMA_Results/"+model+"/"+model_name
-
-    # =============================================================================
-    # Data Retrieval
-    # =============================================================================
-    if d == 1:
-        Power_train = np.expand_dims(Train_y[:, l], -1)
-        y_train = Power_train[1:, :] - Power_train[:-1, :]
-
-        z_train = Train_z[:, l*r_part:(l+1)*r_part]
-        z_train = z_train[1:, :] - z_train[:-1, :]
-        z_train[:, 0] = np.ones(np.shape(z_train)[0])
-
-        n_train = np.shape(y_train)[0]
-        used_n_train = n_train - (p_s*s + p)*2
-
-        n_subtrain = int(used_n_train*0.8)
-        n_validation = used_n_train - n_subtrain
-
-        y_subtrain = y_train[:-n_validation, :]
-        z_subtrain = z_train[:-n_validation, :]
-
-        y_validation = y_train[-n_validation:, :]
-        z_validation = z_train[-n_validation:, :]
-
-        missing_t = Training_data["missing_t"][0]
-        missing_t[1] = missing_t[1]-1
-        missing_t[2] = missing_t[2]-1
-        missing_t[3] = np.shape(y_subtrain)[0]
-        missing_t = [missing_t]
-
-        Training_data = {"y" : y_subtrain, "z" : z_subtrain, "missing_t" : missing_t}
-    elif d == 0:
-        y_train = np.expand_dims(Train_y[:, l], -1)
-
-        z_train = Train_z[:, l*r_part:(l+1)*r_part]
-
-        n_train = np.shape(y_train)[0]
-        used_n_train = n_train - (p_s*s + p)*2
-
-        n_subtrain = int(used_n_train*0.8)
-        n_validation = used_n_train - n_subtrain
-
-        y_subtrain = y_train[:-n_validation, :]
-        z_subtrain = z_train[:-n_validation, :]
-
-        y_validation = y_train[-n_validation:, :]
-        z_validation = z_train[-n_validation:, :]
-
-        missing_t = Training_data["missing_t"][0]
-        missing_t[3] = np.shape(y_subtrain)[0]
-        missing_t = [missing_t]
-
-        Training_data = {"y" : y_subtrain, "z" : z_subtrain, "missing_t" : missing_t}
-
-
-    # =============================================================================
-    # Model Fit and Validation
-    # =============================================================================
-
-    mod = sVARMAX_quick_fit(p, d, q, p_s, q_s, s, m, m_s, Training_data, r_part)
-    Phi, Psi, Xi, Sigma_u = mod.return_parameters()
-
-    if d == 0:
-        P_max = np.max(y_train, axis=0)
-    elif d == 1:
-        P_max = np.max(Power_train, axis=0)
-
-    tau = 288*2
-    if d == 1:
-        MSE, NMAE, eps = mod.test(tau, y_validation, z_validation, [0, n_validation],
-                                             P_max, d, Power_train[-n_validation-1:, :])
-    elif d == 0:
-        MSE, NMAE, eps = mod.test(tau, y_validation, z_validation, [0, n_validation], P_max)
 
