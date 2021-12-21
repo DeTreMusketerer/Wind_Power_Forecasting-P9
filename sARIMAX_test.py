@@ -1,12 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Nov 24 10:24:19 2021
 
-@author: marti
+Created on Fri Nov 26 09:15:22 2021
+
+Authors:  Andreas Anton Andersen, Martin Voigt Vejling, and Morten Stig Kaaber
+E-Mails: {aand17, mvejli17, mkaabe17}@student.aau.dk
+
+This script can be used to train and test s-ARIMAX models, see the report
+        Forecasting Wind Power Production
+            - Chapter 2: Time Series Analysis
+            - Chapter 6: Experimental Setup
+                - Section 6.2.2: s-ARIMAX
+
+The script has been developed using Python 3.9 with the
+libraries numpy and scipy.
+
 """
-
-import os
-import inspect
 
 import numpy as np
 from scipy.io import loadmat, savemat
@@ -15,10 +24,6 @@ from Modules.sVARMAX_Module import sVARMAX
 
 
 if __name__ == '__main__':
-    currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-
-    np.random.seed(49)
-
     Training_data = loadmat("data_energinet/New_Training_Data.mat")
     train_y = Training_data["y"]
     train_z_NWP = Training_data["z_NWP"]
@@ -60,20 +65,17 @@ if __name__ == '__main__':
         model_name = f"{model}_{area}"
         save_path = f"Results/s-ARIMAX/{model_name}"
 
-        mod = sVARMAX(train_y, train_z_reg, train_z_NWP, missing_t_train,
+        mod = sVARMAX(train_y, train_z_reg, train_z_NWP, np.copy(missing_t_train),
                       p, d, q, p_s, q_s, s, m, m_s, l)
         mod.fit()
         Phi, Psi, Xi, Sigma_u = mod.return_parameters()
 
         P_max = np.max(train_y[:, l])
-        Power_test = np.expand_dims(train_y[:, l], -1)
+        Power_test = np.expand_dims(test_y[:, l], -1)
 
-        if d == 0:
-            MSE, NMAE, eps = mod.test(tau_ahead, test_y, test_z_reg, test_z_NWP,
-                                      missing_t_test, P_max)
-        elif d == 1:
-            MSE, NMAE, eps = mod.test(tau_ahead, test_y, test_z_reg, test_z_NWP,
-                                      missing_t_test, P_max, Power_test)
+        MSE, NMAE, eps = mod.test(tau_ahead, test_y, test_z_reg, test_z_NWP,
+                                  np.copy(missing_t_test), P_max, Power_test)
+
         save_dict = {"Wind area": area+" Test",
                       "Model": "s-ARIMAX({}, {}, {}) x ({}, {}, {})_{} with s-ARX({}) x ({})_{}".format(p, d, q, p_s, d_s, q_s, s, m, m_s, s),
                       "Xi": Xi, "Sigma_u": Sigma_u,

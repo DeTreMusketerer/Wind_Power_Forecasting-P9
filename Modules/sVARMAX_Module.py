@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """
+
 Created on Fri Nov 19 11:23:03 2021
 
 Authors:  Andreas Anton Andersen, Martin Voigt Vejling, and Morten Stig Kaaber
@@ -17,7 +18,7 @@ models using the scripts
     - sVARIMAX_validation
     - sVARIMAX_test
 
-The script has been developed using Python 3.9 with the
+The module has been developed using Python 3.9 with the
 libraries numpy and scipy.
 
 """
@@ -621,9 +622,6 @@ class sVARMAX(object):
         """
         print("Commence testing...")
         assert tau_ahead >= 1 and tau_ahead < 55
-
-        if self.d == 0:
-            P_test = y_test.astype(dtype=np.float32)
 
         # Store data
         y_test, test_missing_t = self.do_differencing(y_test.astype(dtype=np.float32), test_missing_t)
