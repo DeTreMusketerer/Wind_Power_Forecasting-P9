@@ -314,6 +314,7 @@ batch_size = 64
 learning_rate = 2e-04
 hidden_size = 512
 hidden_size2 = 512
+hidden_size3 = 512
 dropout_hidden = 0.2
 gamma = 0.7
 log_interval = 100
@@ -388,7 +389,7 @@ for area_idx, wind_area in enumerate(wind_areas):
             valid_loader = torch.utils.data.DataLoader(dset4, batch_size, shuffle = False)
             
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
-            model = pr.LSTM(input_size, hidden_size, hidden_size2, dropout_hidden).to(device)    
+            model = pr.LSTM(input_size, hidden_size, hidden_size2, hidden_size3, dropout_hidden).to(device)    
             optimiser = optim.RMSprop(model.parameters(), lr = learning_rate)
             scheduler = StepLR(optimiser, step_size=1, gamma = gamma)
 
@@ -424,7 +425,7 @@ for area_idx, wind_area in enumerate(wind_areas):
 
         else:
             print(f'\n Re-training:\n')
-            model = pr.LSTM(input_size, hidden_size, hidden_size2, dropout_hidden).to(device) # Reset model parameters
+            model = pr.LSTM(input_size, hidden_size, hidden_size2, hidden_size3, dropout_hidden).to(device) # Reset model parameters
             optimiser = optim.RMSprop(model.parameters(), lr = learning_rate)
             scheduler = StepLR(optimiser, step_size=1, gamma = gamma)
 
