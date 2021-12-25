@@ -6,7 +6,7 @@ Created on Fri Nov 19 11:23:03 2021
 Authors:  Andreas Anton Andersen, Martin Voigt Vejling, and Morten Stig Kaaber
 E-Mails: {aand17, mvejli17, mkaabe17}@student.aau.dk
 
-In this script the main functionality supporting the use of seasonal
+In this module the main functionality supporting the use of seasonal
 autoregressive integrated moving average models as described in the report
         Forecasting Wind Power Production
             - Chapter 2: Time Series Analysis
