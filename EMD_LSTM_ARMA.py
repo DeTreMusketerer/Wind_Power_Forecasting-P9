@@ -32,21 +32,19 @@ from Modules.EMD_RNN import PyTorchDataset, test, validation
 
 if __name__ == "__main__":
     model_basename = "EMD_LSTM_ARMA_001"
-    Is_reg_true = False # Use regulation data?
+    use_reg = False # Use regulation data?
     save_model = True
 
     # Parameters
     threshold = 1e-03
     p = 1
-    d = 0
     q = 0
     p_s = 0
-    d_s = 0 
     q_s = 0
     s = 0
     m = 0
     m_s = 0
-    
+
     # Neural Network
     seed = 42
     torch.manual_seed(seed)
@@ -125,7 +123,7 @@ if __name__ == "__main__":
         f.write("Learning rate decay {}\n".format(gamma))
         f.write("SampEN threshold {}\n".format(threshold))
         f.write("Autoregressive order {}\n".format(p))
-        f.write("Reg is {}".format(Is_reg_true))
+        f.write("Reg is {}".format(use_reg))
     
     for area_idx, wind_area in enumerate(wind_areas):
         print("Area {} of {}".format(area_idx+1, 21))
@@ -142,21 +140,21 @@ if __name__ == "__main__":
             IMF_max = np.max(IMF_subtrain)
 
             if SampEN < threshold: #time series
-                Training_data = {"y": np.expand_dims(IMF_subtrain, -1), "z_reg": reg_sub, "z_NWP": z_sub, "missing_t": missing_t_sub}
-                mod = sVARMAX(p, d, q, p_s, q_s, s, m, m_s,
-                                        Training_data, r_part=r_part, l=area_idx, EMD=True, reg = Is_reg_true)
-                mod.fit(reg = Is_reg_true)
-                Validation_data = {"y": np.expand_dims(IMF_validation, -1), "z_reg": reg_val, "missing_t": missing_t_val}
+                mod = sVARMAX(np.expand_dims(IMF_subtrain, -1), reg_sub, z_sub, missing_t_sub,
+                              p=p, d=0, q=q, p_s=p_s, q_s=q_s, s=s, m=m, m_s=m_s, l=area_idx,
+                              use_NWP=False, use_reg=use_reg)
+                mod.fit()
                 Phi, Psi, Xi, Sigma_u = mod.return_parameters()
-                _, epsilon = mod.EMD_test(1, Validation_data, reg = Is_reg_true)
+                _, _, epsilon = mod.test(1, np.expand_dims(IMF_validation, -1), reg_val, z_val,
+                                         missing_t_val, P_max=np.ones(21))
                 epsilons[:, idx] = epsilon[0, idx_array_Power_val+shift, 0]
 
             else: # Neural network
-                dset1 = PyTorchDataset(intervallength, IMF_train, reg_train, area_idx, idx_Power_train, reg = Is_reg_true)
+                dset1 = PyTorchDataset(intervallength, IMF_train, reg_train, area_idx, idx_Power_train, reg = use_reg)
                 train_loader = torch.utils.data.DataLoader(dset1, batch_size, shuffle = False)
-                dset3 = PyTorchDataset(intervallength, IMF_subtrain, reg_sub, area_idx, idx_Power_sub, reg = Is_reg_true)
+                dset3 = PyTorchDataset(intervallength, IMF_subtrain, reg_sub, area_idx, idx_Power_sub, reg = use_reg)
                 subtrain_loader = torch.utils.data.DataLoader(dset3, batch_size, shuffle = False)
-                dset4 = PyTorchDataset(intervallength, IMF_validation, reg_val, area_idx, idx_Power_val, reg = Is_reg_true)
+                dset4 = PyTorchDataset(intervallength, IMF_validation, reg_val, area_idx, idx_Power_val, reg = use_reg)
                 valid_loader = torch.utils.data.DataLoader(dset4, batch_size, shuffle = False)
 
                 model = U_RNN.LSTM(input_size, hidden_size, hidden_size2, hidden_size3, dropout_hidden).to(device)    
@@ -175,13 +173,13 @@ if __name__ == "__main__":
     
             # RE-TRAIN
             if SampEN < threshold: #time series
-                Training_data = {"y": np.expand_dims(IMF_train, -1), "z_reg": reg_train, "z_NWP": z_train, "missing_t": missing_t_train}
-                mod = sVARMAX(p, d, q, p_s, q_s, s, m, m_s,
-                                        Training_data, r_part=r_part, l=area_idx, EMD=True, reg = Is_reg_true)
-                mod.fit(reg = Is_reg_true)
-                Test_data = {"y": np.expand_dims(IMF_test, -1), "z_reg": reg_test, "missing_t": missing_t_test}
+                mod = sVARMAX(np.expand_dims(IMF_train, -1), reg_train, z_train, missing_t_train,
+                              p=p, d=0, q=q, p_s=p_s, q_s=q_s, s=s, m=m, m_s=m_s, l=area_idx,
+                              use_NWP=False, use_reg=use_reg)
+                mod.fit()
                 Phi, Psi, Xi, Sigma_u = mod.return_parameters()
-                _, epsilon = mod.EMD_test(tau_ahead, Test_data, reg = Is_reg_true)
+                _, _, epsilon = mod.test(tau_ahead, np.expand_dims(IMF_test, -1), reg_test, z_test,
+                                         missing_t_test, P_max=np.ones(21))
                 epsilons_test[:, :, idx] = epsilon[:, idx_array_Power_test+shift, 0]
                 save_dict = {"Xi": Xi, "Sigma_u": Sigma_u}
                 if p != 0 or q_s != 0:
@@ -210,7 +208,7 @@ if __name__ == "__main__":
                         torch.save(model.state_dict(), 'models/' + model_name + '.pt')
     
                 epsilon_array = test(model, device, predictlength, IMF_test, reg_test, batch_size,
-                                     area_idx, intervallength, idx_Power_test, reg = Is_reg_true)
+                                     area_idx, intervallength, idx_Power_test, reg = use_reg)
                 epsilons_test[:, :, idx] = epsilon_array
     
         np.save(f"Learning/EMD_Test_{wind_area}.npy", epsilons_test)
