@@ -122,3 +122,10 @@ scipy 1.7.2
 
 `Open_VARIMA_Results.py`
 	- Script for opening and displaying the results made using the s-VARIMAX models.
+
+## Usage:
+To use this GitHub repository follow these steps:
+
+1) Add the empty folders to your local repository and save the supplied data as indicated by the Files section.
+2) Install Python with the dependencies stated in the Dependencies section.
+3) Train and test models using scripts. Make sure to set the parameters etc. in the scripts. Note that the neural network models are compatible with GPU computing if CUDA is available and we recommend using a GPU for these computations.
