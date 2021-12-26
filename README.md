@@ -128,4 +128,4 @@ To use this GitHub repository follow these steps:
 
 1) Add the empty folders (Indices/, Models/, Learning/, s-ARIMAX/, s-VARIMAX/) to your local repository and save the supplied data as indicated by the Data and Files sections.
 2) Install Python with the dependencies stated in the Dependencies section.
-3) Train and test models using scripts. Make sure to set the parameters etc. in the scripts. Note that the neural network models are compatible with GPU computing if CUDA is available and we recommend using a GPU for these computations.
+3) Train and test models using the scripts. Make sure to set the parameters etc. in the scripts. Note that the neural network models are compatible with GPU computing if CUDA is available and we recommend using a GPU for these computations.
