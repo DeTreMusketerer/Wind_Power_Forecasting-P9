@@ -15,12 +15,9 @@ Dependencies:
 ```
 matplotlib 3.4.3
 numpy 1.21.2
-PyEMD 0.2.13
-pyarrow 5.0.0
 pandas 1.3.4
 pytorch 1.10
 datetime 3.9
-pyentrp 0.7.1
 scipy 1.7.2
 ```
 
@@ -62,7 +59,7 @@ scipy 1.7.2
 ## Files:
 - data_energinet/
 - Learning/
-- models/
+- Models/
 - Results/
 	- s-ARIMAX/
 	- s-VARIMAX/
@@ -71,6 +68,9 @@ scipy 1.7.2
 - Modules/
 	- `Import_Data.py`
 	- `sVARMAX_Module.py`
+	- `Parallel_RNN_Module.py`
+	- `Multi_RNN_Module.py`
+	- `EMD_RNN.py`
 - `Parallel_RNN.py`
 - `Multi_RNN.py`
 - `EMD_LSTM_ARMA.py`
@@ -85,6 +85,15 @@ scipy 1.7.2
 
 `sVARMAX_Module.py`
 	- Module containing the main class for estimation and forecasting with s-ARIMAX and s-VARIMAX models.
+
+`Parallel_RNN_Module.py`
+	- Module containing the methods used to fit and forecast using the univariate RNN models.
+
+`Multi_RNN_Module.py`
+	- Module containing the methods used to fit and forecast using the multivariate RNN models.
+
+`EMD_RNN.py`
+	- Module containing the methods used to fit and forecast using the EMD-LSTM-ARMA models.
 
 ## Scripts:
 `Parrallel_RNN.py`
