@@ -24,9 +24,9 @@ from torch.optim.lr_scheduler import StepLR
 import pandas as pd
 from scipy.io import savemat, loadmat
 
-import Modules.Parrallel_RNN_Module as U_RNN
+import Modules.Parallel_RNN_Module as U_RNN
 from Modules.sVARMAX_Module import sVARMAX
-import Import_Data as imp
+import Modules.Import_Data as imp
 from Modules.EMD_RNN import PyTorchDataset, test, validation
 
 
@@ -101,7 +101,7 @@ if __name__ == "__main__":
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    if Is_reg_true == True:
+    if use_reg == True:
         input_size = intervallength*12 + 1
         r_part = 2
     else:
@@ -205,11 +205,11 @@ if __name__ == "__main__":
                     epoch += 1
     
                 if save_model is True:
-                        torch.save(model.state_dict(), 'models/' + model_name + '.pt')
+                        torch.save(model.state_dict(), f"Models/{model_name}.pt")
     
                 epsilon_array = test(model, device, predictlength, IMF_test, reg_test, batch_size,
                                      area_idx, intervallength, idx_Power_test, reg = use_reg)
                 epsilons_test[:, :, idx] = epsilon_array
     
-        np.save(f"Learning/EMD_Test_{wind_area}.npy", epsilons_test)
-        np.save(f"Learning/EMD_Validation_{wind_area}.npy", epsilons)
+        np.save(f"Results/EMD_LSTM_ARMA/EMD_Test_{wind_area}.npy", epsilons_test)
+        np.save(f"Results/EMD_LSTM_ARMA/EMD_Validation_{wind_area}.npy", epsilons)

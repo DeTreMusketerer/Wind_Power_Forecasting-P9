@@ -153,7 +153,7 @@ def test(model, device, predictlength, z, y, reg, batch_size, l, intervallength,
     NMAE = np.zeros(tau_max, dtype = 'float32')
     point = 12*intervallength
     n = 12*intervallength+12
-    l = len(idx_Power)
+    L = len(idx_Power)
     k = len(idx_NWP)
     if l < 15:
         reg = reg[:,0].astype('float32')
@@ -187,8 +187,8 @@ def test(model, device, predictlength, z, y, reg, batch_size, l, intervallength,
                 output = model(data).squeeze()
                 MSE[tau] += F.mse_loss(output, target, reduction='sum').item()
                 NMAE[tau] += torch.sum(torch.absolute(target - output)/y_max).item()
-        MSE /= l
-        NMAE /= l
+        MSE /= L
+        NMAE /= L
     return MSE, NMAE
 
 

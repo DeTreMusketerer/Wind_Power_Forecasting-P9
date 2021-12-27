@@ -163,7 +163,7 @@ if __name__ == '__main__':
     
                 # Save model?
                 if save_model is True:
-                        torch.save(model.state_dict(), 'models/' + model_name + '.pt')
+                        torch.save(model.state_dict(), f"Models/{model_name}.pt")
 
             # Testing
             print('Testing')
@@ -230,7 +230,7 @@ if __name__ == '__main__':
                                batch_size, l, intervallength, idx_Power_test, idx_NWP_test, y_max[l])
         
         # Save results
-        with open('Learning/Test_MSE_' + model_name + '.npy', 'wb') as file:
+        with open('Results/U-RNN/Test_MSE_' + model_name + '.npy', 'wb') as file:
             np.save(file, MSE)
-        with open('Learning/Test_NMAE_' + model_name + '.npy', 'wb') as file:
+        with open('Results/U-RNN/Test_NMAE_' + model_name + '.npy', 'wb') as file:
             np.save(file, NMAE)

@@ -230,7 +230,7 @@ def test(model, device, predictlength, z, y, reg, batch_size, intervallength, id
     NMAE = np.zeros((21,tau_max), dtype = 'float32')
     point = 12*intervallength
     n = 12*intervallength+12
-    l = len(idx_Power)
+    L = len(idx_Power)
     k = len(idx_NWP)
     with torch.no_grad():
         for i in range(k):
@@ -264,8 +264,8 @@ def test(model, device, predictlength, z, y, reg, batch_size, intervallength, id
                 output = model(data).squeeze()
                 MSE[:,tau] += torch.sum((output - target)**2, dim = 0).cpu().numpy()
                 NMAE[:,tau] += torch.sum(torch.absolute(target-output).cpu()/y_max, dim = 0).numpy()
-        MSE /= l
-        NMAE /= l
+        MSE /= L
+        NMAE /= L
     return MSE, NMAE
 
 
