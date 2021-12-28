@@ -105,7 +105,7 @@ if __name__ == '__main__':
         model_start = U_RNN.LSTM(input_size, hidden_size, hidden_size2, hidden_size3, dropout_hidden).to(device)        
 
     with open(f"Models/specs_{model_basename}.txt", "w") as f:
-        f.write("Type: {}".format(Type))
+        f.write("Type: {}\n".format(Type))
         f.write("Batch size {}\n".format(batch_size))
         f.write("Input_size {}\n".format(input_size))
         f.write("Hidden sizes {}, {}\n".format(hidden_size, hidden_size2))

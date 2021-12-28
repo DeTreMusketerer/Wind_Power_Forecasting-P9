@@ -57,7 +57,7 @@ if __name__ == "__main__":
     hidden_size3 = 512
     dropout_hidden = 0.2
     gamma = 0.7
-    log_interval = 100
+    log_interval = 1000
     patience = 15
     
     intervallength = 1 # Number of hours in a training datapoint.
@@ -146,7 +146,7 @@ if __name__ == "__main__":
                 mod.fit()
                 Phi, Psi, Xi, Sigma_u = mod.return_parameters()
                 _, _, epsilon = mod.test(1, np.expand_dims(IMF_validation, -1), reg_val, z_val,
-                                         missing_t_val, P_max=np.ones(21))
+                                         missing_t_val, P_max=np.ones(21), P_test=np.expand_dims(IMF_validation, -1))
                 epsilons[:, idx] = epsilon[0, idx_array_Power_val+shift, 0]
 
             else: # Neural network
@@ -179,7 +179,7 @@ if __name__ == "__main__":
                 mod.fit()
                 Phi, Psi, Xi, Sigma_u = mod.return_parameters()
                 _, _, epsilon = mod.test(tau_ahead, np.expand_dims(IMF_test, -1), reg_test, z_test,
-                                         missing_t_test, P_max=np.ones(21))
+                                         missing_t_test, P_max=np.ones(21), P_test=np.expand_dims(IMF_validation, -1))
                 epsilons_test[:, :, idx] = epsilon[:, idx_array_Power_test+shift, 0]
                 save_dict = {"Xi": Xi, "Sigma_u": Sigma_u}
                 if p != 0 or q_s != 0:
