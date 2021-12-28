@@ -440,7 +440,7 @@ class sVARMAX(object):
         eps = Y - X @ B
         return B, eps
 
-    def estimate_noise(self, tau_ahead, y_test, z_NWP_test, z_reg_test, test_missing_t, reg=True):
+    def estimate_noise(self, tau_ahead, y_test, z_NWP_test, z_reg_test, test_missing_t):
         """
         Parameters
         ----------
@@ -486,10 +486,7 @@ class sVARMAX(object):
                     u_hat[t, :] -= np.dot(self.Phi[j], y_test[t-idx, :])
                 for i, idx in enumerate(array_MA):
                     u_hat[t, :] += np.dot(self.Psi[i], u_hat[t-idx, :])
-                if reg is True:
-                    z_data = self.make_z(0, t, z_reg_test, z_NWP_test)
-                elif reg is False:
-                    z_data = self.make_z(0, t, z_reg_test, z_NWP_test, reg)
+                z_data = self.make_z(0, t, z_reg_test, z_NWP_test)
                 u_hat[t, :] -= np.dot(self.Xi, z_data)
         return u_hat
 
