@@ -73,6 +73,7 @@ scipy 1.7.2
 	- `EMD_RNN.py`
 - `Parallel_RNN.py`
 - `Multi_RNN.py`
+- `Persistence.py`
 - `EMD_LSTM_ARMA.py`
 - `sARIMAX_validation.py`
 - `sARIMAX_test.py`
@@ -101,6 +102,9 @@ scipy 1.7.2
 	
 `Multi_RNN.py`
 	- Script for training and testing multivariate LSTMs and GRUs.
+
+`Persistence.py`
+	- Script for testing the persistence method.
 
 `EMD_LSTM_ARMA.py`
 	- Script for training and testing the EMD_LSTM_ARMA model.
