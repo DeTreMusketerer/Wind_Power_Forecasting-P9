@@ -205,7 +205,7 @@ if __name__ == "__main__":
                     epoch += 1
     
                 if save_model is True:
-                        torch.save(model.state_dict(), 'models/' + model_name + '.pt')
+                        torch.save(model.state_dict(), f"Models/{model_name}.pt")
     
                 epsilon_array = test(model, device, predictlength, IMF_test, reg_test, batch_size,
                                      area_idx, intervallength, idx_Power_test, reg = use_reg)

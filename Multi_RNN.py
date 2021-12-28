@@ -157,7 +157,7 @@ if __name__ == "__main__":
 
         # Save model?
         if save_model is True:
-            torch.save(model.state_dict(), 'models/' + model_name + '.pt')
+            torch.save(model.state_dict(), f"Models/{model_name}.pt")
 
     # Testing
     y_max = np.zeros(21)
