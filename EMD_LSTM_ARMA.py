@@ -24,9 +24,9 @@ from torch.optim.lr_scheduler import StepLR
 import pandas as pd
 from scipy.io import savemat, loadmat
 
-import Modules.Parrallel_RNN_Module as U_RNN
+import Modules.Parallel_RNN_Module as U_RNN
 from Modules.sVARMAX_Module import sVARMAX
-import Import_Data as imp
+import Modules.Import_Data as imp
 from Modules.EMD_RNN import PyTorchDataset, test, validation
 
 
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     hidden_size3 = 512
     dropout_hidden = 0.2
     gamma = 0.7
-    log_interval = 100
+    log_interval = 1000
     patience = 15
     
     intervallength = 1 # Number of hours in a training datapoint.
@@ -89,6 +89,7 @@ if __name__ == "__main__":
     z_val = np.float32(file_valid['z_NWP'])
     reg_val = np.float32(file_valid['z_reg'])
     missing_t_val = file_valid['missing_t'][0, :]
+    missing_t_val[-1] = missing_t_val[-1]-1
     
     idx_Power_train = imp.Index_dict_train_Power(intervallength)
     idx_Power_val = imp.Index_dict_validation_Power(intervallength)
@@ -101,7 +102,7 @@ if __name__ == "__main__":
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    if Is_reg_true == True:
+    if use_reg == True:
         input_size = intervallength*12 + 1
         r_part = 2
     else:
@@ -112,7 +113,7 @@ if __name__ == "__main__":
     idx_array_Power_val = np.array(list(idx_Power_val.values()))
     idx_array_Power_test = np.array(list(idx_Power_test.values()))
     
-    with open("Models/specs.txt", "w") as f:
+    with open("Models/specs_EMD_LSTM_ARMA.txt", "w") as f:
         f.write("Batch size {}\n".format(batch_size))
         f.write("Input_size {}\n".format(input_size))
         f.write("Hidden sizes {}, {}\n".format(hidden_size, hidden_size2))
@@ -146,7 +147,7 @@ if __name__ == "__main__":
                 mod.fit()
                 Phi, Psi, Xi, Sigma_u = mod.return_parameters()
                 _, _, epsilon = mod.test(1, np.expand_dims(IMF_validation, -1), reg_val, z_val,
-                                         missing_t_val, P_max=np.ones(21))
+                                         missing_t_val, P_max=np.ones(21), P_test=np.expand_dims(IMF_validation, -1))
                 epsilons[:, idx] = epsilon[0, idx_array_Power_val+shift, 0]
 
             else: # Neural network
@@ -179,7 +180,7 @@ if __name__ == "__main__":
                 mod.fit()
                 Phi, Psi, Xi, Sigma_u = mod.return_parameters()
                 _, _, epsilon = mod.test(tau_ahead, np.expand_dims(IMF_test, -1), reg_test, z_test,
-                                         missing_t_test, P_max=np.ones(21))
+                                         missing_t_test, P_max=np.ones(21), P_test=np.expand_dims(IMF_validation, -1))
                 epsilons_test[:, :, idx] = epsilon[:, idx_array_Power_test+shift, 0]
                 save_dict = {"Xi": Xi, "Sigma_u": Sigma_u}
                 if p != 0 or q_s != 0:
@@ -211,5 +212,5 @@ if __name__ == "__main__":
                                      area_idx, intervallength, idx_Power_test, reg = use_reg)
                 epsilons_test[:, :, idx] = epsilon_array
     
-        np.save(f"Learning/EMD_Test_{wind_area}.npy", epsilons_test)
-        np.save(f"Learning/EMD_Validation_{wind_area}.npy", epsilons)
+        np.save(f"Results/EMD_LSTM_ARMA/EMD_Test_{wind_area}.npy", epsilons_test)
+        np.save(f"Results/EMD_LSTM_ARMA/EMD_Validation_{wind_area}.npy", epsilons)

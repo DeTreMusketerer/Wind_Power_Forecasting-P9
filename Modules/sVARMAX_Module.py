@@ -248,17 +248,25 @@ class sVARMAX(object):
         """
 
         if self.p_s == 0 and self.q_s == 0:
-            if self.d == 0:
+            if self.d == 0 and self.l == "all":
                 print(f"Fit a VARX({p}) model.")
-            elif self.d == 1:
+            elif self.d == 1 and self.l == "all":
                 print(f"Fit a VARIMAX({p}, {self.d}, {0}) model.")
+            elif self.d == 0 and self.l != "all":
+                print(f"Fit a ARX({p}) model.")
+            elif self.d == 1 and self.l != "all":
+                print(f"Fit a ARIMAX({p}, {self.d}, {0}) model.")
             else:
                 raise AssertionError("Invalid differencing input. Options are d={0, 1}.")
         else:
-            if self.d == 0:
+            if self.d == 0 and self.l == "all":
                 print(f"Fit a s-VARX({p}) x ({p_s})_{s} model.")
-            elif self.d == 1:
+            elif self.d == 1 and self.l == "all":
                 print(f"Fit a s-VARIMAX({p}, {self.d}, {0}) x ({p_s}, {0}, {0})_{s} model.")
+            elif self.d == 0 and self.l != "all":
+                print(f"Fit a s-ARX({p}) x ({p_s})_{s} model.")
+            elif self.d == 1 and self.l != "all":
+                print(f"Fit a s-ARIMAX({p}, {self.d}, {0}) x ({p_s}, {0}, {0})_{s} model.")
             else:
                 raise AssertionError("Invalid differencing input. Options are d={0, 1}.")
 
@@ -356,10 +364,15 @@ class sVARMAX(object):
         _, _, _, u_hat = self.sVARX_fit(m, m_s, self.s)
 
         if self.p_s == 0 and self.q_s == 0:
-            print(f"Fit a VARIMAX({self.p}, {self.d}, {self.q}) model.")
+            if self.l == "all":
+                print(f"Fit a VARIMAX({self.p}, {self.d}, {self.q}) model.")
+            elif self.l != "all":
+                print(f"Fit a ARIMAX({self.p}, {self.d}, {self.q}) model.")
         else:
-            print(f"Fit a s-VARIMAX({self.p}, {self.d}, {self.q}) x ({self.p_s}, {0}, {self.q_s})_{self.s} model.")
-
+            if self.l == "all":
+                print(f"Fit a s-VARIMAX({self.p}, {self.d}, {self.q}) x ({self.p_s}, {0}, {self.q_s})_{self.s} model.")
+            elif self.l != "all":
+                print(f"Fit a s-ARIMAX({self.p}, {self.d}, {self.q}) x ({self.p_s}, {0}, {self.q_s})_{self.s} model.")
 
         # Step 2)
         delay_list_AR = [j_s*self.s+j for j_s in range(self.p_s+1) for j in range(self.p+1)][1:]
@@ -440,7 +453,7 @@ class sVARMAX(object):
         eps = Y - X @ B
         return B, eps
 
-    def estimate_noise(self, tau_ahead, y_test, z_NWP_test, z_reg_test, test_missing_t, reg=True):
+    def estimate_noise(self, tau_ahead, y_test, z_NWP_test, z_reg_test, test_missing_t):
         """
         Parameters
         ----------
@@ -486,10 +499,7 @@ class sVARMAX(object):
                     u_hat[t, :] -= np.dot(self.Phi[j], y_test[t-idx, :])
                 for i, idx in enumerate(array_MA):
                     u_hat[t, :] += np.dot(self.Psi[i], u_hat[t-idx, :])
-                if reg is True:
-                    z_data = self.make_z(0, t, z_reg_test, z_NWP_test)
-                elif reg is False:
-                    z_data = self.make_z(0, t, z_reg_test, z_NWP_test, reg)
+                z_data = self.make_z(0, t, z_reg_test, z_NWP_test)
                 u_hat[t, :] -= np.dot(self.Xi, z_data)
         return u_hat
 
