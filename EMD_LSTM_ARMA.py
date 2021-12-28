@@ -89,6 +89,7 @@ if __name__ == "__main__":
     z_val = np.float32(file_valid['z_NWP'])
     reg_val = np.float32(file_valid['z_reg'])
     missing_t_val = file_valid['missing_t'][0, :]
+    missing_t_val[-1] = missing_t_val[-1]-1
     
     idx_Power_train = imp.Index_dict_train_Power(intervallength)
     idx_Power_val = imp.Index_dict_validation_Power(intervallength)
