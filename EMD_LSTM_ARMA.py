@@ -112,7 +112,7 @@ if __name__ == "__main__":
     idx_array_Power_val = np.array(list(idx_Power_val.values()))
     idx_array_Power_test = np.array(list(idx_Power_test.values()))
     
-    with open("Models/specs.txt", "w") as f:
+    with open("Models/specs_EMD_LSTM_ARMA.txt", "w") as f:
         f.write("Batch size {}\n".format(batch_size))
         f.write("Input_size {}\n".format(input_size))
         f.write("Hidden sizes {}, {}\n".format(hidden_size, hidden_size2))
