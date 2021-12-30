@@ -20,8 +20,7 @@ from scipy.io import loadmat
 
 
 if __name__ == '__main__':
-    model = "model001_validation" # Give input here
-
+    model = "model001_test" # Give input here
 
     wind_areas = ["DK1-1", "DK1-2", "DK1-3", "DK1-4", "DK1-5", "DK1-6", "DK1-7", "DK1-8", "DK1-9", "DK1-10", "DK1-11", "DK1-12", "DK1-13", "DK1-14", "DK1-15", "DK2-1", "DK2-2", "DK2-3", "DK2-4", "DK2-5", "DK2-6"]
 

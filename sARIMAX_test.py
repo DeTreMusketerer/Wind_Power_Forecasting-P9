@@ -65,7 +65,9 @@ if __name__ == '__main__':
         model_name = f"{model}_{area}"
         save_path = f"Results/s-ARIMAX/{model_name}"
 
-        mod = sVARMAX(train_y, train_z_reg, train_z_NWP, np.copy(missing_t_train),
+        Power_train = np.expand_dims(train_y[:, l], -1)
+
+        mod = sVARMAX(Power_train, train_z_reg, train_z_NWP, np.copy(missing_t_train),
                       p, d, q, p_s, q_s, s, m, m_s, l)
         mod.fit()
         Phi, Psi, Xi, Sigma_u = mod.return_parameters()
@@ -73,8 +75,8 @@ if __name__ == '__main__':
         P_max = np.max(train_y[:, l])
         Power_test = np.expand_dims(test_y[:, l], -1)
 
-        MSE, NMAE, eps = mod.test(tau_ahead, test_y, test_z_reg, test_z_NWP,
-                                  np.copy(missing_t_test), P_max, Power_test)
+        MSE, NMAE, eps = mod.test(tau_ahead, Power_test, test_z_reg, test_z_NWP,
+                                  np.copy(missing_t_test), P_max)
 
         save_dict = {"Wind area": area+" Test",
                       "Model": "s-ARIMAX({}, {}, {}) x ({}, {}, {})_{} with s-ARX({}) x ({})_{}".format(p, d, q, p_s, d_s, q_s, s, m, m_s, s),

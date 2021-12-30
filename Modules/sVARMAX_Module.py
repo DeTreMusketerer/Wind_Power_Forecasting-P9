@@ -167,17 +167,18 @@ class sVARMAX(object):
 
         """
         if self.d == 0:
-            if self.l != "all":
-                power = np.expand_dims(y[:, self.l], -1)
-                y = power
+            return y, missing_t
+            # if self.l != "all":
+            #     power = np.expand_dims(y[:, self.l], -1)
+            #     y = power
         elif self.d == 1:
-            if self.l != "all":
-                power = np.expand_dims(y[:, self.l], -1)
-            elif self.l == "all":
-                power = y
-            y = power[1:, :] - power[:-1, :]
+            # if self.l != "all":
+            #     power = np.expand_dims(y[:, self.l], -1)
+            # elif self.l == "all":
+            #     power = y
+            y = y[1:, :] - y[:-1, :]
             missing_t[1:] = missing_t[1:]-1
-        return y, missing_t
+            return y, missing_t
 
     def update_parameters(self, Theta):
         """
@@ -504,7 +505,7 @@ class sVARMAX(object):
         return u_hat
 
     def forecast(self, tau_ahead, y_test, z_reg_test, z_NWP_test,
-                 test_missing_t, P_test = None):
+                 test_missing_t, P_test):
         """
 
         Compute the tau-ahead forecast using the truncated forecasting as
@@ -531,7 +532,6 @@ class sVARMAX(object):
             zero and the last entry in the list is n.
         P_test : ndarray, size=(n_test+1, k), optional
             Wind power at time t-2. Used when first order differencing is used.
-            The default is None.
 
         Returns
         -------
@@ -613,8 +613,7 @@ class sVARMAX(object):
                         P_bar = y_bar
         return P_bar, idx_list
 
-    def test(self, tau_ahead, y_test, z_reg_test, z_NWP_test, test_missing_t,
-             P_max, P_test=None):
+    def test(self, tau_ahead, y_test, z_reg_test, z_NWP_test, test_missing_t, P_max):
         """
 
         Test function. This function assumes the parameters have been fitted
@@ -642,9 +641,6 @@ class sVARMAX(object):
         P_max : ndarray, size=(k,)
             Maximum wind power measured in the training data for each wind
             area.
-        P_test : ndarray, size=(k,), optional
-            Wind power at time t-2. Used when first order differencing is used.
-            The default is None.
 
         Returns
         -------
@@ -660,7 +656,9 @@ class sVARMAX(object):
         assert tau_ahead >= 1 and tau_ahead < 55*12
 
         # Store data
+        P_test = np.copy(y_test)
         y_test, test_missing_t = self.do_differencing(y_test.astype(dtype=np.float32), test_missing_t)
+        n_test, _ = y_test.shape
         if self.use_reg:
             z_reg_test = z_reg_test.astype(dtype=np.float32)
         else:
@@ -674,16 +672,17 @@ class sVARMAX(object):
                                         test_missing_t, P_test)
 
         idx_array = np.array(idx_list)
-        eps = np.zeros((tau_ahead, len(idx_list), self.k))
+        #eps = np.zeros((tau_ahead, len(idx_list), self.k))
+        eps = np.zeros((tau_ahead, n_test, self.k))
         for tau_i in range(tau_ahead):
             if self.d == 0:
-                eps[tau_i, :, :] = P_bar[tau_i, idx_array, :] - P_test[idx_array+tau_i, :]
+                eps[tau_i, idx_array, :] = P_bar[tau_i, idx_array, :] - P_test[idx_array+tau_i, :]
             elif self.d == 1:
-                eps[tau_i, :, :] = P_bar[tau_i, idx_array, :] - P_test[idx_array+tau_i+1, :]
+                eps[tau_i, idx_array, :] = P_bar[tau_i, idx_array, :] - P_test[idx_array+tau_i+1, :]
 
         print(f"Residual shape: {eps.shape}")
-        MSE = np.mean(eps**2, axis=1)
-        NMAE = np.mean(np.abs(eps), axis=1)/P_max
+        MSE = np.mean(eps[:, idx_array, :]**2, axis=1)
+        NMAE = np.mean(np.abs(eps[:, idx_array, :]), axis=1)/P_max
         return MSE, NMAE, eps
 
     def make_NWP_z(self, tau_i, t, z_reg, z_NWP):

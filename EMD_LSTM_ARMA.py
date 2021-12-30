@@ -62,7 +62,7 @@ if __name__ == "__main__":
     
     intervallength = 1 # Number of hours in a training datapoint.
     predictlength = 24 # Number of hours we predict ahead.
-    tau_ahead = 288
+    tau_ahead = predictlength*12
 
     file_train = loadmat('data_energinet/New_Training_Data.mat')
     file_test = loadmat('data_energinet/New_Test_Data.mat')
@@ -89,7 +89,7 @@ if __name__ == "__main__":
     z_val = np.float32(file_valid['z_NWP'])
     reg_val = np.float32(file_valid['z_reg'])
     missing_t_val = file_valid['missing_t'][0, :]
-    missing_t_val[-1] = missing_t_val[-1]-1
+    #missing_t_val[-1] = missing_t_val[-1] - 1
     
     idx_Power_train = imp.Index_dict_train_Power(intervallength)
     idx_Power_val = imp.Index_dict_validation_Power(intervallength)
@@ -147,7 +147,7 @@ if __name__ == "__main__":
                 mod.fit()
                 Phi, Psi, Xi, Sigma_u = mod.return_parameters()
                 _, _, epsilon = mod.test(1, np.expand_dims(IMF_validation, -1), reg_val, z_val,
-                                         missing_t_val, P_max=np.ones(21), P_test=np.expand_dims(IMF_validation, -1))
+                                         missing_t_val, P_max=np.ones(21))
                 epsilons[:, idx] = epsilon[0, idx_array_Power_val+shift, 0]
 
             else: # Neural network
@@ -164,11 +164,11 @@ if __name__ == "__main__":
 
                 opt_upd, upd_epoch, valid_loss, training_loss, min_valid_loss = U_RNN.early_stopping(
                     model, device, optimiser, scheduler, subtrain_loader, valid_loader, log_interval, patience, epochs)
-    
+
                 dictionary = {'Validation_loss': valid_loss, 'Training_loss': training_loss}  
                 df3 = pd.DataFrame(dictionary) 
                 df3.to_csv(f"Learning/Train_{model_name}.csv", index=False)
-                
+
                 _, epsilon_array = validation(model, device, valid_loader, batch_size)
                 epsilons[:,idx] = epsilon_array
     
@@ -180,14 +180,14 @@ if __name__ == "__main__":
                 mod.fit()
                 Phi, Psi, Xi, Sigma_u = mod.return_parameters()
                 _, _, epsilon = mod.test(tau_ahead, np.expand_dims(IMF_test, -1), reg_test, z_test,
-                                         missing_t_test, P_max=np.ones(21), P_test=np.expand_dims(IMF_validation, -1))
+                                         missing_t_test, P_max=np.ones(21))
                 epsilons_test[:, :, idx] = epsilon[:, idx_array_Power_test+shift, 0]
                 save_dict = {"Xi": Xi, "Sigma_u": Sigma_u}
                 if p != 0 or q_s != 0:
                     save_dict.update({"Phi": Phi})
                 if q != 0 or q_s != 0:
                     save_dict.update({"Psi": Psi})
-                savemat(f"models/ARMA_{wind_area}_IMF{idx+1}.mat", save_dict)
+                savemat(f"Models/{model_name}.mat", save_dict)
     
             else:
                 print("\n Re-training:\n")
@@ -212,5 +212,5 @@ if __name__ == "__main__":
                                      area_idx, intervallength, idx_Power_test, reg = use_reg)
                 epsilons_test[:, :, idx] = epsilon_array
     
-        np.save(f"Results/EMD_LSTM_ARMA/EMD_Test_{wind_area}.npy", epsilons_test)
-        np.save(f"Results/EMD_LSTM_ARMA/EMD_Validation_{wind_area}.npy", epsilons)
+        np.save(f"Results/EMD_LSTM_ARMA/EMD_Test_{model_basename}_{wind_area}.npy", epsilons_test)
+        np.save(f"Results/EMD_LSTM_ARMA/EMD_Validation_{model_basename}_{wind_area}.npy", epsilons)

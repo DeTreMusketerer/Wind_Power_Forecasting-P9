@@ -76,10 +76,9 @@ if __name__ == '__main__':
     Phi, Psi, Xi, Sigma_u = mod.return_parameters()
 
     P_max = np.max(test_y, axis=0)
-    Power_test = test_y
 
     MSE, NMAE, eps = mod.test(tau_ahead, test_y, test_z_reg, test_z_NWP,
-                              np.copy(missing_t_test), P_max, Power_test)
+                              np.copy(missing_t_test), P_max)
 
     save_dict = {"Model": "s-VARIMAX({}, {}, {}) x ({}, {}, {})_{} with s-VARX({}) x ({})_{}".format(p, d, q, p_s, d_s, q_s, s, m, m_s, s),
                  "Xi": Xi, "Sigma_u": Sigma_u,

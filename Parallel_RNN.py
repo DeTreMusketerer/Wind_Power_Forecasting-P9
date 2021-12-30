@@ -171,9 +171,9 @@ if __name__ == '__main__':
                                    intervallength, idx_Power_test, idx_NWP_test, y_max[l])
 
             # Save results
-            with open('Learning/Test_MSE_' + model_name + '.npy', 'wb') as file:
+            with open('Results/U-RNN/Test_MSE_' + model_name + '.npy', 'wb') as file:
                 np.save(file, MSE)
-            with open('Learning/Test_NMAE_' + model_name + '.npy', 'wb') as file:
+            with open('Results/U-RNN/Test_NMAE_' + model_name + '.npy', 'wb') as file:
                 np.save(file, NMAE)
     else:
         model_name = f"{model_basename}_{wind_areas[l]}"
