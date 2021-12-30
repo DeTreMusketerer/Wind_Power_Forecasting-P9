@@ -63,8 +63,13 @@ scipy 1.7.2
 - Results/
 	- s-ARIMAX/
 	- s-VARIMAX/
+	- U-RNN/
+	- M-RNN/
+	- EMD_LSTM_ARMA/
 	- `Open_ARIMA_Results.py`
 	- `Open_VARIMA_Results.py`
+	- `Open_U-RNN_Results.py`
+	- `Open_M-RNN_Results.py`
 - Modules/
 	- `Import_Data.py`
 	- `sVARMAX_Module.py`
@@ -126,6 +131,12 @@ scipy 1.7.2
 
 `Open_VARIMA_Results.py`
 	- Script for opening and displaying the results made using the s-VARIMAX models.
+
+`Open_U-RNN_Results.py`
+	- Script for opening and displaying the results made using the univariate RNN models.
+
+`Open_M-RNN_Results.py`
+	- Script for opening and displaying the results made using the multivariate RNN models.
 
 ## Usage:
 To use this GitHub repository follow these steps:
