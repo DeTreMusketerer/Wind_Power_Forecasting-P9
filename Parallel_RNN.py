@@ -32,7 +32,7 @@ import Modules.Parallel_RNN_Module as U_RNN
 
 if __name__ == '__main__':
     model_basename = "U_RNN_001"
-    Type = "GRU"
+    Type = "LSTM"
     all_areas = True
     load_model = False
     save_model = True
@@ -42,7 +42,6 @@ if __name__ == '__main__':
     torch.manual_seed(seed)
     np.random.seed(seed)
     epochs = 100
-    input_size = 588
     batch_size = 32
     learning_rate = 0.00011
     hidden_size = 512
@@ -56,8 +55,10 @@ if __name__ == '__main__':
     # Data
     area_list = [i for i in range(21)]
     l = area_list[0]
-    intervallength = 48 # Number of hours in a training datapoint.
+    intervallength = 1 # Number of hours in a training datapoint.
     predictlength = 24 # Number of hours we predict ahead.
+
+    input_size = intervallength*12+12
 
     file_train = scipy.io.loadmat('data_energinet/New_Training_Data.mat')
     file_test = scipy.io.loadmat('data_energinet/New_Test_Data.mat')

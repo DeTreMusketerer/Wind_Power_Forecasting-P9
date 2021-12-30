@@ -32,7 +32,7 @@ import Modules.Multi_RNN_Module as M_RNN
 
 if __name__ == "__main__":
     model_name = "M_RNN_001"
-    Type = "GRU"
+    Type = "LSTM"
     all_areas = True
     load_model = False
     save_model = True
@@ -41,7 +41,6 @@ if __name__ == "__main__":
     seed = 42
     torch.manual_seed(seed)
     np.random.seed(seed)
-    input_size = 24
     epochs = 100 # maximum number of epochs (should not be relevant due to early stopping)
     batch_size = 128
     learning_rate = 0.00031
@@ -50,13 +49,14 @@ if __name__ == "__main__":
     hidden_size3 = 512
     dropout_hidden = 0.1
     eta_d = 0.7 # learning rate update
-    num_layers = 1 # number of parrallel layers
     log_interval = 100
     patience = 100
 
     # Data
     intervallength = 1 # Number of hours in a training datapoint.
     predictlength = 24 # Number of hours we predict ahead.
+
+    input_size = intervallength*12+12
 
     file_train = scipy.io.loadmat('data_energinet/New_Training_Data.mat')
     file_test = scipy.io.loadmat('data_energinet/New_Test_Data.mat')
@@ -109,7 +109,7 @@ if __name__ == "__main__":
     model = model_start
 
     with open(f"Models/specs_{model_name}.txt", "w") as f:
-        f.write("Type: {}".format(Type))
+        f.write("Type: {}\n".format(Type))
         f.write("Batch size {}\n".format(batch_size))
         f.write("Input_size {}\n".format(input_size))
         f.write("Hidden sizes {}, {}\n".format(hidden_size, hidden_size2))
